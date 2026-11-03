@@ -1,0 +1,11 @@
+torch
+torchvision
+numpy
+scikit-learn
+scikit-image
+scipy
+pandas
+matplotlib
+pyyaml
+tqdm
+huggingface_hub

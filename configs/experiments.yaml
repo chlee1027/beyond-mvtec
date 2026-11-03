@@ -1,0 +1,36 @@
+# 실험 범위. README의 「방법과 설정」 표와 같은 내용이다. 바꾸면 README도 같이 고친다.
+
+seeds: [0, 1, 2]
+
+preprocess:
+  reproduce:          # 1단계 재현 (MVTec만), PatchCore 원 논문과 같음
+    resize: 256
+    center_crop: 224
+  compare:            # 2~3단계 비교 (세 데이터셋 공통), 가장자리 결함이 잘리지 않게 자르지 않음
+    resize: 256
+    center_crop: null
+
+datasets:
+  mvtec_ad:
+    categories: all   # 15 부류
+  visa:
+    categories: all   # 12 부류
+    split: 1cls       # 공식 분할 CSV
+  real_iad:
+    categories: []    # 내려받은 뒤 확정
+    views: [C1]       # 한 시점만
+    image_size: 256   # 줄인 판 사용
+
+methods:
+  patchcore:
+    backbones: [resnet18, wide_resnet50_2]
+    layers: [[2, 3], [1, 2, 3]]
+    coreset_ratio: [0.01, 0.10]
+    neighborhood: 3   # 조각 특징을 3x3 이웃으로 평균
+  padim:
+    backbones: [resnet18, wide_resnet50_2]
+    layers: [[1, 2, 3], [2, 3]]
+    reduced_dims: {resnet18: 100, wide_resnet50_2: 550}
+
+few_shot:             # Q2. 방법마다 Q1에서 가장 좋은 설정 하나로
+  n_train: [all, 50, 10]
