@@ -8,3 +8,6 @@ data/*
 *.npz
 __pycache__/
 .ipynb_checkpoints/
+
+# 논문 PDF 는 저작권 때문에 올리지 않는다. papers/download.sh 로 받는다
+papers/pdf/

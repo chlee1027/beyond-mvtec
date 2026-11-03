@@ -1,10 +1,16 @@
 # beyond-mvtec
 
-**정리된 데이터에서 고른 이상 탐지 설정이 현장형 데이터에서도 그대로 통하는가.**
+**MVTec AD에서 고른 이상 탐지 설정이 다른 산업 데이터셋에서도 같은 순서로 통하는가.**
 
-공장 외관 검사용 이상 탐지 모델은 정상 이미지만으로 학습한다. 백본, 특징을 꺼낼 층, 메모리 뱅크 크기 같은 설정은 보통 MVTec AD 결과를 보고 고른다. MVTec AD는 촬영 조건을 맞춰 정리한 데이터다(물체가 가운데 있고 조명이 같다). 실제 라인에서 찍은 이미지는 부품이 여러 개 들어 있거나 정렬이 어긋나 있다. 이 레포는 MVTec AD에서 매긴 설정 순위가 VisA와 Real-IAD에서도 유지되는지 잰다.
+공장 외관 검사용 이상 탐지 모델은 정상 이미지만으로 학습한다. 백본, 특징을 꺼낼 층, 메모리 뱅크 크기 같은 설정은 보통 MVTec AD 결과를 보고 고른다. 그런데 세 데이터셋은 촬영 조건이 다르다.
 
-> **상태 (2026-11-03).** 뼈대만 있다. 아직 아무 실험도 돌리지 않았고 결과 표는 비어 있다.
+- **MVTec AD**는 촬영 장비와 조명을 통제해 찍었다. 물체 부류 가운데 Toothbrush·Capsule·Pill은 원문 표현으로 「roughly aligned」이고, Metal Nut·Screw·Hazelnut은 무작위로 회전되어 있다(MVTec AD 논문 3절).
+- **VisA**에는 한 이미지에 물체가 여러 개 든 부류가 4개 있다. Capsules는 약 20개, Candle·Macaroni1·Macaroni2는 4개씩이다. 논문이 물체 위치·자세 차이가 크다고 적은 부류는 Capsules·Macaroni2다.
+- **Real-IAD**는 30 부류 151,050장 규모다. 한 물체를 다섯 방향에서 찍었고 원본 해상도가 2,000~5,000px이다. 생산 라인에서 찍은 이미지는 아니다. 실물 제품을 사서 결함을 손으로 만들고, 시제품 촬영 장치로 찍었다(Real-IAD 논문).
+
+이 레포는 MVTec AD에서 매긴 설정 순위가 VisA와 Real-IAD에서도 유지되는지 잰다.
+
+> **상태 (2026-11-03).** 실험은 아직 하나도 돌리지 않았고 결과 표는 비어 있다. 관련 논문 여섯 편의 분석 노트는 [`papers/notes/`](papers/notes/)에 있다.
 
 ---
 
@@ -15,17 +21,21 @@
 | Q1 (주) | MVTec AD에서 정한 설정 순위가 VisA, Real-IAD에서도 같은가 | 설정 12개의 이미지 AUROC 순위, 데이터셋 쌍마다 Kendall 순위 상관 |
 | Q2 (보조) | 정상 학습 이미지를 줄일 때 떨어지는 폭이 데이터셋마다 다른가 | 학습 장수(전체 / 50 / 10)별 이미지 AUROC |
 
-Q2는 새 제품을 라인에 막 넣어 정상 샘플이 적은 상황을 흉내 낸다.
+Q2는 새 제품을 라인에 막 넣어 정상 샘플이 적은 상황을 흉내 낸다. MVTec AD는 부류마다 학습 장수가 60장(Toothbrush)에서 391장(Hazelnut)까지다. 그래서 「50장」은 Toothbrush에서는 전체의 83%이고 Hazelnut에서는 13%다.
 
 ## 데이터셋
 
-| 데이터셋 | 내용 | 이 레포에서 쓰는 범위 | 받는 법 · 라이선스 |
+| 데이터셋 | 내용 | 이 레포에서 쓰는 범위 | 받는 곳 · 라이선스 |
 |---|---|---|---|
-| MVTec AD | 15 부류, 학습 3,629장 (정상만), 시험 1,725장 | 15 부류 전부 | MVTec 홈페이지 신청 후 내려받기, CC BY-NC-SA 4.0 |
-| VisA | 12 부류, 부품 여러 개가 들어간 이미지 포함 | 12 부류 전부, 공식 1cls 분할 | amazon-science/spot-diff, 라이선스 확인 필요 |
-| Real-IAD | 30 부류, 약 15만 장, 한 물체를 5개 시점(C1~C5)에서 촬영 | 부류 일부와 한 시점, 범위는 내려받은 뒤 확정 | Hugging Face `Real-IAD/Real-IAD`, 저자 승인 필요, 라이선스 확인 필요 |
+| MVTec AD | 15 부류. 학습 3,629장(정상만), 시험 1,725장. 정사각 700~1024px. Grid·Screw·Zipper는 흑백 | 15 부류 전부 | MVTec 홈페이지. CC BY-NC-SA 4.0(홈페이지 기준이고 논문에는 적혀 있지 않다) |
+| VisA | 12 부류. 정상 9,621장, 이상 1,200장. 4,000 x 6,000 센서로 촬영 | 12 부류 전부, 공식 1cls 분할(부류마다 정상 90%로 학습하고, 남은 정상 10%와 이상 전부로 시험) | `amazon-science/spot-diff`. 저장소 코드는 Apache-2.0이고 데이터 라이선스는 확인 필요 |
+| Real-IAD | 30 부류. 정상 99,721장, 이상 51,329장. 시점 5개 | 부류 일부와 위 시점 하나. 범위는 받은 뒤 확정 | Hugging Face `Real-IAD/Real-IAD`. 저자 승인 필요, 라이선스 확인 필요 |
 
 데이터는 레포에 올리지 않는다. 받는 순서는 [`data/README.md`](data/README.md)에 있다.
+
+**Real-IAD를 쓰는 방식.** 논문의 single-view 설정은 30 부류 모두에서 위(top view) 한 시점만 쓴다. 이 레포도 같은 시점을 쓰지만 부류는 일부만 쓴다. 그래서 30 부류 평균이 아니라 부록 표 5에서 해당 부류 행과 맞댄다. 두 가지를 더 지킨다.
+- 시점 이름 C1~C5는 anomalib 문서의 표기이고 논문에는 없다(논문은 No.1~No.5). C1이 위 시점인지는 받은 뒤 사진으로 확인한다.
+- 이상 표본 안에서도 결함이 안 보이는 시점의 사진은 정상이다. 그래서 표본 라벨이 아니라 이미지 라벨로 채점한다.
 
 ## 방법과 설정
 
@@ -38,22 +48,30 @@ Q2는 새 제품을 라인에 막 넣어 정상 샘플이 적은 상황을 흉�
 
 | 부분 | 출처 |
 |---|---|
-| PatchCore | 원 저자 공개 코드 [`amazon-science/patchcore-inspection`](https://github.com/amazon-science/patchcore-inspection)을 그대로 쓴다. 이 레포에서는 VisA·Real-IAD 데이터 읽기만 덧붙인다 |
-| PaDiM | 저자 공식 코드가 없어서 이 레포에서 직접 구현한다 (`src/`) |
-| 지표 (이미지·픽셀 AUROC, PRO) | 두 방법이 같은 코드로 재도록 이 레포에 하나 둔다. 원본 PatchCore 코드는 PRO를 내지 않는다 |
+| PatchCore | 원 저자 공개 코드 [`amazon-science/patchcore-inspection`](https://github.com/amazon-science/patchcore-inspection)(Apache-2.0)을 쓴다. 이 레포에서 고칠 것은 다섯이다. (1) 백본 목록에 resnet18 추가, (2) 이미지 점수와 분할 지도 저장(원본은 `results.csv`만 남긴다), (3) Q2용 50장·10장 표본 고르기(원본 `--train_val_split`은 정렬된 파일 앞에서부터 자른다), (4) VisA·Real-IAD 데이터 읽기, (5) 아래 「전처리」의 정사각 줄이기 |
+| PaDiM | 저자 공식 코드가 없어서 이 레포에서 직접 구현한다(`src/`). 구현 값은 PaDiM 논문 노트의 「구현 명세」 절을 따른다 |
+| 지표 (이미지·픽셀 AUROC, PRO) | 두 방법이 같은 코드로 재도록 이 레포에 하나 둔다. 원본 PatchCore 코드는 PRO를 계산하지 않는다 |
 
 Q1에서 비교하는 설정은 12개다.
 
 | 방법 | 백본 | 층 | 그 밖 | 개수 |
 |---|---|---|---|---:|
 | PatchCore | ResNet18, WRN-50-2 | (2,3), (1,2,3) | 코어셋 1%, 10% | 8 |
-| PaDiM | ResNet18, WRN-50-2 | (1,2,3), (2,3) | 차원 수는 원 논문대로 (R18 100, WRN 550) | 4 |
+| PaDiM | ResNet18, WRN-50-2 | (1,2,3), (2,3) | 줄인 차원 R18 100, WRN 550 | 4 |
 
-코어셋 시작점과 PaDiM 차원 고르기에 무작위성이 있으므로 설정마다 시드 3개로 돌리고 평균과 표준편차를 적는다. 정확한 값은 [`configs/experiments.yaml`](configs/experiments.yaml)에 있다.
+- **원 논문이 직접 잰 칸은 일부다.** PatchCore 논문이 잰 것은 WRN-50-2 (2,3)의 10%와 1%뿐이다. ResNet18은 논문에도 원본 코드의 백본 목록에도 없다. PaDiM 논문은 층 (1,2,3) 하나만 쟀다. 줄인 차원 100·550도 그 조합에서 정한 값이다. (2,3)에 같은 차원 수를 쓰는 것은 이 레포의 선택이다.
+- **시드.** 코어셋 시작점과 PaDiM 차원 고르기에 무작위성이 있다. 그래서 설정마다 시드 3개로 돌리고 평균과 표준편차를 적는다. 원본 PatchCore 코드는 시드 하나로 numpy·torch·cuda를 모두 고정한다.
+- **PaDiM 공분산과 적은 학습 장수.** 공분산 정규화 항은 원 논문 값 ε = 0.01을 고정해 쓴다. 학습이 N장이면 공분산 계수(rank)는 N−1을 넘지 못하고, 나머지 방향은 ε만으로 채워진다. MVTec 부류당 학습은 약 240장이다. 그래서 WRN-550은 학습 장수를 줄이지 않아도 이 상태다. Q2의 50장·10장에서는 R18-100도 그렇다. 원 논문은 이 상황을 다루지 않는다. 그래서 결과 표에 ε를 함께 적는다.
 
-**전처리.** PatchCore 원 논문은 256으로 줄인 뒤 가운데 224를 자른다. 이렇게 자르면 가장자리에 있는 결함이 잘려 나갈 수 있다(원 논문 부록 C.4에 그런 시험 이미지가 하나 적혀 있다). VisA와 Real-IAD에서는 물체가 가운데 있지 않은 경우가 있어서 이 문제가 더 커질 수 있다. 그래서 두 단계로 나눈다.
-- 재현 단계(MVTec만): 원 논문과 같이 256 -> 224 가운데 자르기
-- 비교 단계(세 데이터셋): 셋 다 256 x 256으로 줄이기만 하고 자르지 않음
+정확한 값은 [`configs/experiments.yaml`](configs/experiments.yaml)에 있다.
+
+**전처리.** PatchCore 원 논문은 256으로 줄인 뒤 가운데 224를 자른다. 이렇게 자르면 가장자리 결함이 잘릴 수 있다. 원 논문 부록 C.4는 거짓 음성 23장 가운데 1장을 그런 사례로 든다. 그래서 두 단계로 나눈다.
+- 재현 단계(MVTec만): 원 논문과 같이 256 -> 224 가운데 자르기.
+- 비교 단계(세 데이터셋): 256 x 256으로 줄이기만 하고 자르지 않는다. torchvision의 `Resize(256)`은 짧은 변만 맞추고 비율을 지키므로, 정사각이 아닌 이미지에 `CenterCrop`을 붙이면 긴 변이 잘린다. 그래서 `Resize((256, 256))`으로 두 변을 다 맞춘다. VisA처럼 정사각이 아닌 이미지는 가로세로비가 바뀐다. 이 선택은 VisA 해상도를 잰 뒤 다시 본다.
+
+두 단계에 공통으로 적용하는 것도 있다.
+- 흑백 이미지(MVTec Grid·Screw·Zipper)는 채널을 세 번 복사한다.
+- 정답 마스크는 최근접 보간으로 줄인다. 원본 PatchCore 코드는 양선형 보간 뒤 정수로 바꾸는데, 그러면 마스크 가장자리가 줄어든다.
 
 ## 진행 순서
 
@@ -68,16 +86,35 @@ Q1에서 비교하는 설정은 12개다.
 |---|---:|---:|---:|---|
 | PatchCore-10%, WRN-50-2 (2,3) | 99.0 | 98.1 | 93.5 | PatchCore 논문 표 1 · 2 · 3 |
 | PatchCore-1%, WRN-50-2 (2,3) | 99.0 | 98.0 | 93.1 | 같은 곳 |
-| PaDiM, WRN-50-2 | 95.3 | 97.5 | 92.1 | PatchCore 논문 표 1 · 2 · 3에 옮겨 적힌 값 |
+| PaDiM, WRN-50-2 | 95.3 | 97.5 | 92.1 | PaDiM 논문 표 V(이미지) · 표 III(픽셀, PRO) |
+| PaDiM, ResNet18 (차원 100) | 논문에 없음 | 96.7 | 90.1 | PaDiM 논문 표 III |
 
-판정 기준은 이미지 AUROC가 목표값에서 ±0.5 안, 픽셀 AUROC와 PRO는 ±1.0 안이면 재현된 것으로 본다. 이 폭은 시드 3개의 흩어짐을 본 뒤 다시 정한다.
+판정 기준: 이미지 AUROC는 목표값 ±0.5 안, 픽셀 AUROC와 PRO는 ±1.0 안이면 재현된 것으로 본다. 이 폭은 시드 3개의 흩어짐을 본 뒤 다시 정한다. 판정할 때 지킬 것이 둘 있다.
+- **PatchCore 원본 코드는 논문과 값이 다르다.** 원본 코드 README가 보고한 WRN-50-2 10%(시드 0) 값은 99.2 · 98.1이다. 부류 값도 논문과 다르고, Screw에서는 1.77점 차이가 난다. 코드 README의 PRO 열(94.4)은 논문 93.5와 0.9 다르다. 코드의 PRO는 이 레포 정의와 다른 계산일 수 있다. 그래서 PRO가 어긋나면 정의부터 맞춰 본다.
+- **부류별로 대조할 때.** Toothbrush는 시험이 정상 12장, 결함 30장이라 (정상, 결함) 쌍 하나가 뒤집히면 이미지 AUROC가 0.28점 움직인다.
+
+### 다른 데이터셋의 참고값 (범위 확인용)
+
+아래 값은 백본·층·코어셋 비율·해상도가 논문에 적혀 있지 않거나 이 레포와 다르다. 그래서 재현 판정에는 쓰지 않고, 이 레포 값이 같은 범위에 드는지만 본다.
+
+| 데이터셋 | 방법 | 이미지 AUROC | 픽셀 지표 | 출처와 조건 |
+|---|---|---:|---:|---|
+| VisA (1cls, 12 부류 평균) | PatchCore, WRN-50 | 92.4 | 98.4 (픽셀 AUROC) | VisA 논문 표 6. 같은 표의 MVTec 값이 99.8이라 PatchCore 원 논문(99.0~99.1)과 설정이 다르다 |
+| VisA (1cls, 12 부류 평균) | PaDiM, ResNet-50 | 87.8 | 93.1 (픽셀 AUROC) | VisA 논문 표 2. 백본이 이 레포와 다르다 |
+| Real-IAD (single-view, 30 부류 평균) | PatchCore | 90.4 | 92.5 | Real-IAD 논문 표 2, anomalib으로 돌림. 픽셀 지표 이름이 표 2에서는 P-AUPRO, 표 5에서는 P-AUROC로 갈린다 |
+| Real-IAD (single-view, 30 부류 평균) | PaDiM | 86.6 | 90.0 | 같은 곳 |
+
+Q2의 참고값(MVTec AD, PatchCore 논문 표 S5)도 있다. 학습 10장에서 이미지 AUROC는 PatchCore-10이 93.6, 다시 구현한 PaDiM이 83.2다. 학습 50장에서는 전체 학습 때보다 각각 1.5, 5.3 떨어진다.
 
 ## 지표
 
 - **이미지 AUROC**: 이미지 점수로 정상과 이상을 가를 때의 ROC 곡선 아래 넓이. 부류마다 재서 평균한다.
 - **픽셀 AUROC**: 같은 넓이를 픽셀 하나하나를 표본으로 잰 것.
-- **PRO**: 결함 영역을 연결 성분으로 나눠 영역마다 겹침을 재는 분할 지표. MVTec AD 평가 관례대로 거짓 양성률 0.3까지 적분하고 0~1로 정규화한다.
+- **PRO (per-region overlap)**: 정답 마스크를 연결 성분(결함 영역)으로 나눈다. 영역마다 예측과 겹친 비율을 재고, 영역 크기와 상관없이 평균한다. 문턱을 훑어 거짓 양성률(FPR) 0~0.3 구간의 곡선 넓이를 구하고 최댓값이 1이 되게 정규화한다. 출처는 Uninformed Students 논문 4.2절이다. MVTec AD 논문(CVPR 2019)에는 이 정의가 없다.
+  - 원 논문에 없어서 이 레포가 정해야 하는 것이 있다. 연결 방식(4-연결 또는 8-연결), 문턱 개수, FPR을 부류 전체 픽셀을 모아 한 번에 낼지 이미지별로 낼지, 결함 없는 시험 이미지를 넣을지, 영역 평균을 부류 단위로 낼지 이미지 단위로 낼지, FPR 0.3에서의 보간과 적분 방식이다. 평균 단위 하나만 바꿔도 같은 예측이 0.25와 0.50으로 갈리는 예가 있다(Uninformed Students 노트 7절).
+  - 구현할 때 각 항목의 선택을 여기에 적는다. 공개된 MVTec 평가 코드의 선택과 맞출 계획이고, 그 코드를 읽은 뒤 확정한다.
 - **Kendall 순위 상관 (Q1)**: 두 데이터셋에서 설정 12개의 순위가 얼마나 같은지 나타내는 값. 1이면 순위가 똑같고 0이면 관계가 없다. 설정이 12개뿐이라 이 값 하나로는 불확실성이 크다. 그래서 순위 표를 같이 싣는다.
+  - 예로, Real-IAD 논문 표 2의 방법 일곱을 이미지 AUROC 순위로 비교하면 MVTec–Real-IAD 사이 Kendall 순위 상관이 0.62다(21쌍 중 4쌍이 뒤집힘, 내가 계산한 값). 이것은 방법 사이의 순위이고, 이 레포가 재는 설정 사이의 순위가 아니다.
 
 ## 결과
 
@@ -87,11 +124,28 @@ Q1에서 비교하는 설정은 12개다.
 
 아직 없다. 실험을 돌린 뒤 채운다.
 
+## 논문 노트
+
+원문을 처음부터 끝까지 읽고 쓴 분석 노트다. 표·그림마다 무엇을 바꾸고 무엇을 고정했는지, 반복 수는 몇인지, 주장이 결과보다 센지를 적었다. 부류별 표가 있으면 평균을 다시 계산해 인쇄된 값과 대조했다.
+
+| 노트 | 이 레포에서 쓰는 곳 |
+|---|---|
+| [PatchCore (CVPR 2022)](papers/notes/CVPR22_PatchCore_Towards_Total_Recall_in_Industrial_Anomaly_Detection.md) | 비교 방법, 원본 코드 사용법, 재현 목표 |
+| [PaDiM (ICPR 2021 워크숍)](papers/notes/ICPRW21_PaDiM_Patch_Distribution_Modeling_Framework_for_Anomaly_Detection_and_Localization.md) | 비교 방법, 직접 구현할 때의 구현 명세 |
+| [MVTec AD (CVPR 2019)](papers/notes/CVPR19_MVTecAD_Comprehensive_Real_World_Dataset_for_Unsupervised_Anomaly_Detection.md) | 데이터셋 구성, 부류별 장수와 정렬 상태 |
+| [Uninformed Students (CVPR 2020)](papers/notes/CVPR20_Uninformed_Students_Student_Teacher_Anomaly_Detection_with_Discriminative_Latent_Embeddings.md) | PRO 지표의 원 출처, PRO 구현 명세 |
+| [VisA (ECCV 2022)](papers/notes/ECCV22_VisA_SPot_the_Difference_Self_Supervised_Pretraining_for_Anomaly_Detection_and_Segmentation.md) | 데이터셋 구성, 공식 분할, 참고값 |
+| [Real-IAD (CVPR 2024)](papers/notes/CVPR24_RealIAD_Real_World_Multi_View_Dataset_for_Benchmarking_Versatile_Industrial_Anomaly_Detection.md) | 데이터셋 구성, single-view 정의, 참고값 |
+
+논문 PDF는 저작권 때문에 레포에 올리지 않는다. `bash papers/download.sh`로 `papers/pdf/`에 받는다.
+
 ## 폴더
 
 ```
 configs/experiments.yaml   실험 범위(설정, 시드, 학습 장수)
 data/README.md             데이터 받는 법 (데이터 자체는 올리지 않음)
+papers/notes/              논문 분석 노트 여섯 편
+papers/download.sh         논문 PDF 받기 (PDF는 올리지 않음)
 src/                       구현 (만들 예정)
 notebooks/                 Colab 실행 노트북 (만들 예정)
 results/                   결과 CSV와 그림
@@ -106,5 +160,6 @@ Google Colab Pro, NVIDIA L4 GPU. 패키지는 `requirements.txt`.
 - Roth et al., *Towards Total Recall in Industrial Anomaly Detection* (PatchCore), CVPR 2022.
 - Defard et al., *PaDiM: a Patch Distribution Modeling Framework for Anomaly Detection and Localization*, ICPR Workshops 2021.
 - Bergmann et al., *MVTec AD — A Comprehensive Real-World Dataset for Unsupervised Anomaly Detection*, CVPR 2019.
+- Bergmann et al., *Uninformed Students: Student-Teacher Anomaly Detection with Discriminative Latent Embeddings*, CVPR 2020.
 - Zou et al., *SPot-the-Difference Self-Supervised Pre-training for Anomaly Detection and Segmentation* (VisA), ECCV 2022.
 - Wang et al., *Real-IAD: A Real-World Multi-View Dataset for Benchmarking Versatile Industrial Anomaly Detection*, CVPR 2024.
