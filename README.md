@@ -10,7 +10,7 @@
 
 이 레포는 MVTec AD에서 매긴 설정 순위가 VisA와 Real-IAD에서도 유지되는지 잰다.
 
-> **상태 (2026-11-03).** 실험은 아직 하나도 돌리지 않았고 결과 표는 비어 있다. 관련 논문 여섯 편의 분석 노트는 [`papers/notes/`](papers/notes/)에 있다.
+> **상태 (2026-11-06).** 구현과 재현 노트북까지 끝났다. MVTec 15 부류 재현은 아직 돌리지 않았고 결과 표는 비어 있다. 지금 있는 값은 CPU에서 두 부류, 시드 하나로 코드를 확인한 것이다(아래 「구현 확인」). 관련 논문 여섯 편의 분석 노트는 [`papers/notes/`](papers/notes/)에 있다.
 
 ---
 
@@ -48,9 +48,10 @@ Q2는 새 제품을 라인에 막 넣어 정상 샘플이 적은 상황을 흉�
 
 | 부분 | 출처 |
 |---|---|
-| PatchCore | 원 저자 공개 코드 [`amazon-science/patchcore-inspection`](https://github.com/amazon-science/patchcore-inspection)(Apache-2.0)을 쓴다. 이 레포에서 고칠 것은 다섯이다. (1) 백본 목록에 resnet18 추가, (2) 이미지 점수와 분할 지도 저장(원본은 `results.csv`만 남긴다), (3) Q2용 50장·10장 표본 고르기(원본 `--train_val_split`은 정렬된 파일 앞에서부터 자른다), (4) VisA·Real-IAD 데이터 읽기, (5) 아래 「전처리」의 정사각 줄이기 |
-| PaDiM | 저자 공식 코드가 없어서 이 레포에서 직접 구현한다(`src/`). 구현 값은 PaDiM 논문 노트의 「구현 명세」 절을 따른다 |
-| 지표 (이미지·픽셀 AUROC, PRO) | 두 방법이 같은 코드로 재도록 이 레포에 하나 둔다. 원본 PatchCore 코드는 PRO를 계산하지 않는다 |
+| PatchCore | 원 저자 공개 코드 [`amazon-science/patchcore-inspection`](https://github.com/amazon-science/patchcore-inspection)(Apache-2.0)을 커밋 `fcaa92f`로 고정해 쓴다. 원본 파일은 고치지 않고 [`patchcore_adapter.py`](src/beyond_mvtec/patchcore_adapter.py)에서 바깥으로 끼운다. 바꾸는 것은 다섯이다. (1) 백본 목록에 resnet18 추가, (2) 이미지 점수와 분할 지도 저장(원본은 `results.csv`만 남긴다), (3) Q2용 50장·10장 표본 고르기(원본 `--train_val_split`은 정렬된 파일 앞에서부터 자른다), (4) VisA·Real-IAD 데이터 읽기, (5) 아래 「전처리」의 정사각 줄이기 |
+| PaDiM | 저자 공식 코드가 없어서 직접 구현했다([`padim.py`](src/beyond_mvtec/padim.py)). 원 논문이 정한 값은 그대로 쓰고, 정하지 않은 값은 아래 「PaDiM에서 이 레포가 고른 값」에 적었다 |
+| 지표 (이미지·픽셀 AUROC, PRO) | 두 방법이 같은 코드로 재도록 [`metrics.py`](src/beyond_mvtec/metrics.py) 하나를 쓴다. 원본 PatchCore 코드는 PRO를 계산하지 않는다 |
+| 데이터 읽기 | 세 데이터셋의 파일 목록과 전처리는 [`data.py`](src/beyond_mvtec/data.py), 설정 목록·실행·판정은 [`experiment.py`](src/beyond_mvtec/experiment.py)에 있다 |
 
 Q1에서 비교하는 설정은 12개다.
 
@@ -64,6 +65,17 @@ Q1에서 비교하는 설정은 12개다.
 - **PaDiM 공분산과 적은 학습 장수.** 공분산 정규화 항은 원 논문 값 ε = 0.01을 고정해 쓴다. 학습이 N장이면 공분산 계수(rank)는 N−1을 넘지 못하고, 나머지 방향은 ε만으로 채워진다. MVTec 부류당 학습은 약 240장이다. 그래서 WRN-550은 학습 장수를 줄이지 않아도 이 상태다. Q2의 50장·10장에서는 R18-100도 그렇다. 원 논문은 이 상황을 다루지 않는다. 그래서 결과 표에 ε를 함께 적는다.
 
 정확한 값은 [`configs/experiments.yaml`](configs/experiments.yaml)에 있다.
+
+**PaDiM에서 이 레포가 고른 값.** 원 논문에 적혀 있지 않은 자리다. 재현이 어긋나면 여기부터 다시 본다.
+
+| 자리 | 고른 값 |
+|---|---|
+| 가중치 | torchvision `IMAGENET1K_V1`. 원본 PatchCore의 `pretrained=True`와 같은 가중치다 |
+| 입력 정규화 | ImageNet 평균·표준편차 |
+| 작은 특징 지도를 격자에 맞추는 법 | 최근접 복제. 격자는 쓴 층 가운데 가장 큰 지도다 |
+| 무작위 차원 | 시드 하나에 한 벌을 전 위치·전 부류에 쓴다. 중복 없이 뽑는다 |
+| 이미지 점수 | 쌍삼차로 입력 크기까지 키우고 sigma=4로 평활한 지도의 최댓값 |
+| 평활 | `scipy.ndimage.gaussian_filter` 기본값. 원본 PatchCore의 평활과 같은 함수다 |
 
 **전처리.** PatchCore 원 논문은 256으로 줄인 뒤 가운데 224를 자른다. 이렇게 자르면 가장자리 결함이 잘릴 수 있다. 원 논문 부록 C.4는 거짓 음성 23장 가운데 1장을 그런 사례로 든다. 그래서 두 단계로 나눈다.
 - 재현 단계(MVTec만): 원 논문과 같이 256 -> 224 가운데 자르기.
@@ -93,6 +105,39 @@ Q1에서 비교하는 설정은 12개다.
 - **PatchCore 원본 코드는 논문과 값이 다르다.** 원본 코드 README가 보고한 WRN-50-2 10%(시드 0) 값은 99.2 · 98.1이다. 부류 값도 논문과 다르고, Screw에서는 1.77점 차이가 난다. 코드 README의 PRO 열(94.4)은 논문 93.5와 0.9 다르다. 코드의 PRO는 이 레포 정의와 다른 계산일 수 있다. 그래서 PRO가 어긋나면 정의부터 맞춰 본다.
 - **부류별로 대조할 때.** Toothbrush는 시험이 정상 12장, 결함 30장이라 (정상, 결함) 쌍 하나가 뒤집히면 이미지 AUROC가 0.28점 움직인다.
 
+### 구현 확인 (2026-11-06)
+
+재현 판정이 아니다. 조건은 CPU, MVTec의 Bottle·Screw 두 부류, 시드 0이다. 값은 [`results/check_two_classes_cpu.csv`](results/check_two_classes_cpu.csv)에 있다.
+
+**원본 실행기와 대조.** 같은 조건에서 원본 `bin/run_patchcore.py`(장치 선택 함수만 CPU로 바꿔 끼움)와 이 레포 경로의 이미지 AUROC를 맞댔다. 세 칸 모두 CSV에 찍힌 자릿수까지 같다.
+
+| 설정 | 부류 | 원본 실행기 | 이 레포 |
+|---|---|---:|---:|
+| WRN-50-2 (2,3) 1% | Screw | 0.9739700758352122 | 0.9739700758352122 |
+| WRN-50-2 (2,3) 1% | Bottle | 1.0 | 1.0 |
+| WRN-50-2 (2,3) 10% | Screw | 0.9877023980323837 | 0.9877023980323837 |
+
+10% Screw 값은 원본 레포에 공개된 모델의 `results.csv`(시드 0) 값과도 같다.
+
+**논문 부류 값과 대조.** 왼쪽이 이 레포, 오른쪽이 논문이다(PatchCore 표 S1·S2·S3, PaDiM 표 III). 단위는 %다.
+
+| 설정 | 부류 | 이미지 AUROC | 픽셀 AUROC | PRO |
+|---|---|---:|---:|---:|
+| PatchCore-10% | Bottle | 100 / 100 | 98.59 / 98.6 | 94.68 / 96.1 |
+| PatchCore-10% | Screw | 98.77 / 97.0 | 99.42 / 99.4 | 97.05 / 97.9 |
+| PatchCore-1% | Bottle | 100 / 100 | 98.58 / 98.5 | 94.65 / 95.9 |
+| PatchCore-1% | Screw | 97.40 / 96.4 | 99.23 / 99.2 | 95.97 / 97.1 |
+| PaDiM WRN-50-2 | Bottle | 99.92 / 없음 | 98.15 / 98.3 | 94.87 / 94.8 |
+| PaDiM WRN-50-2 | Screw | 86.14 / 없음 | 98.45 / 98.5 | 93.89 / 94.4 |
+| PaDiM ResNet18 | Bottle | 99.60 / 없음 | 98.08 / 98.1 | 94.27 / 93.9 |
+| PaDiM ResNet18 | Screw | 78.21 / 없음 | 97.33 / 97.4 | 90.88 / 91.3 |
+
+- **PatchCore PRO가 논문보다 0.85~1.42점 낮다. 원인은 찾지 못했다.** 같은 지표 코드에서 PaDiM은 논문과 -0.51~+0.37점 차이다. 저장한 지도로 마스크 처리(최근접, 원본식)와 이미지 범위(전체, 결함 이미지만)를 조합한 네 가지를 다시 재 봤지만 네 칸 모두 논문보다 낮았다. 15 부류 평균이 판정 폭 ±1.0을 넘을 수 있으므로 재현 때 먼저 본다.
+- **Screw 이미지 AUROC는 논문보다 1.0~1.77점 높다.** 원본 실행기도 같은 값을 내므로 이 레포 경로의 차이가 아니다.
+- **마스크 처리가 픽셀 AUROC를 바꾼다.** 원본은 Screw 99.41·99.52, Bottle 98.47·98.48(1%·10%)이다. 이 레포 마스크(최근접)로는 위 표의 값이 된다. 이 레포 지도에 원본식 마스크를 씌워 다시 재면 원본 값이 나와 원인이 마스크임을 확인했다. 원본식에서는 결함 픽셀 수가 Screw 68.7%, Bottle 92.9%로 준다. 논문과의 차이는 최근접이 0.08점 이내, 원본식이 0.21점 이내다.
+
+**아직 확인하지 못한 것.** GPU와 faiss GPU 경로, VisA·Real-IAD 실제 파일. Real-IAD 읽기는 가짜 파일로만 시험했다. 시험은 `tests/`에 58개 있고 모두 통과한다. PRO는 문턱마다 직접 세는 계산과 맞댄다.
+
 ### 다른 데이터셋의 참고값 (범위 확인용)
 
 아래 값은 백본·층·코어셋 비율·해상도가 논문에 적혀 있지 않거나 이 레포와 다르다. 그래서 재현 판정에는 쓰지 않고, 이 레포 값이 같은 범위에 드는지만 본다.
@@ -111,8 +156,21 @@ Q2의 참고값(MVTec AD, PatchCore 논문 표 S5)도 있다. 학습 10장에서
 - **이미지 AUROC**: 이미지 점수로 정상과 이상을 가를 때의 ROC 곡선 아래 넓이. 부류마다 재서 평균한다.
 - **픽셀 AUROC**: 같은 넓이를 픽셀 하나하나를 표본으로 잰 것.
 - **PRO (per-region overlap)**: 정답 마스크를 연결 성분(결함 영역)으로 나눈다. 영역마다 예측과 겹친 비율을 재고, 영역 크기와 상관없이 평균한다. 문턱을 훑어 거짓 양성률(FPR) 0~0.3 구간의 곡선 넓이를 구하고 최댓값이 1이 되게 정규화한다. 출처는 Uninformed Students 논문 4.2절이다. MVTec AD 논문(CVPR 2019)에는 이 정의가 없다.
-  - 원 논문에 없어서 이 레포가 정해야 하는 것이 있다. 연결 방식(4-연결 또는 8-연결), 문턱 개수, FPR을 부류 전체 픽셀을 모아 한 번에 낼지 이미지별로 낼지, 결함 없는 시험 이미지를 넣을지, 영역 평균을 부류 단위로 낼지 이미지 단위로 낼지, FPR 0.3에서의 보간과 적분 방식이다. 평균 단위 하나만 바꿔도 같은 예측이 0.25와 0.50으로 갈리는 예가 있다(Uninformed Students 노트 7절).
-  - 구현할 때 각 항목의 선택을 여기에 적는다. 공개된 MVTec 평가 코드의 선택과 맞출 계획이고, 그 코드를 읽은 뒤 확정한다.
+  - 원 논문이 정하지 않은 자리는 MVTec 평가 코드(`pro_curve_util.py`, `generic_util.py`)의 선택을 따랐다. 평균 단위 하나만 바꿔도 같은 예측이 0.25와 0.50으로 갈리는 예가 있어서(Uninformed Students 노트 7절) 아래에 다 적는다.
+
+    | 자리 | 이 레포의 선택 |
+    |---|---|
+    | 연결 방식 | 8-연결 |
+    | 문턱 | 점수의 서로 다른 값 전부. 개수를 따로 정하지 않는다 |
+    | FPR | 부류의 정상 픽셀을 모두 모아 한 번에 나눈다 |
+    | 결함 없는 시험 이미지 | 넣는다(정상 픽셀에 들어간다) |
+    | 영역 평균 | 부류의 모든 영역에 같은 무게. 이미지별로 먼저 평균하지 않는다 |
+    | FPR 0.3 | 양옆 점을 선형 보간 |
+    | 적분 | 사다리꼴. 곡선은 (0, 0)에서 시작하고 0.3으로 나눈다 |
+    | 해상도 | 입력 크기(재현 224, 비교 256). 마스크는 최근접으로 줄인다 |
+    | 평균 단위 | 부류마다 재서 단순 평균 |
+
+  - 이 선택의 근거는 MVTec 평가 코드의 사본(`TArdelean/AnomalyLocalizationFCA`의 `evaluation/`)을 읽은 것이다. MVTec 배포본을 직접 받아 대조하지 못했고, 사본을 실행해 값을 맞대 보지도 않았다.
 - **Kendall 순위 상관 (Q1)**: 두 데이터셋에서 설정 12개의 순위가 얼마나 같은지 나타내는 값. 1이면 순위가 똑같고 0이면 관계가 없다. 설정이 12개뿐이라 이 값 하나로는 불확실성이 크다. 그래서 순위 표를 같이 싣는다.
   - 예로, Real-IAD 논문 표 2의 방법 일곱을 이미지 AUROC 순위로 비교하면 MVTec–Real-IAD 사이 Kendall 순위 상관이 0.62다(21쌍 중 4쌍이 뒤집힘, 내가 계산한 값). 이것은 방법 사이의 순위이고, 이 레포가 재는 설정 사이의 순위가 아니다.
 
@@ -146,14 +204,24 @@ configs/experiments.yaml   실험 범위(설정, 시드, 학습 장수)
 data/README.md             데이터 받는 법 (데이터 자체는 올리지 않음)
 papers/notes/              논문 분석 노트 여섯 편
 papers/download.sh         논문 PDF 받기 (PDF는 올리지 않음)
-src/                       구현 (만들 예정)
-notebooks/                 Colab 실행 노트북 (만들 예정)
+src/beyond_mvtec/          구현: data, metrics, padim, patchcore_adapter, experiment
+tests/                     pytest. 원본 PatchCore를 쓰는 시험은 PATCHCORE_SRC가 없으면 건너뛴다
+notebooks/00_check_visa_realiad.ipynb   Drive의 VisA·Real-IAD 점검 (학습 없음)
+notebooks/01_reproduce_mvtec.ipynb      1단계 재현 (Colab)
 results/                   결과 CSV와 그림
 ```
 
 ## 실행 환경
 
-Google Colab Pro, NVIDIA L4 GPU. 패키지는 `requirements.txt`.
+Google Colab Pro, NVIDIA L4 GPU. 패키지는 `requirements.txt`. faiss는 환경마다 판이 달라 목록에 넣지 않았다(Colab GPU는 `faiss-gpu-cu12`, CPU는 `faiss-cpu`).
+
+시험은 CPU에서 돈다.
+
+```
+git clone https://github.com/amazon-science/patchcore-inspection.git
+git -C patchcore-inspection checkout fcaa92f
+PATCHCORE_SRC=patchcore-inspection/src python -m pytest tests
+```
 
 ## 참고 문헌
 

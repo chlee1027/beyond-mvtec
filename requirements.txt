@@ -9,3 +9,8 @@ matplotlib
 pyyaml
 tqdm
 huggingface_hub
+timm
+click
+pretrainedmodels
+pytest
+# faiss 는 환경마다 판이 다르다. Colab GPU 는 faiss-gpu-cu12, CPU 는 faiss-cpu

@@ -1,0 +1,9 @@
+dataset,category,setting,method,backbone,layers,coreset_ratio,reduced_dim,cov_eps,preprocess,n_train_requested,n_train,seed,n_test,n_regions,image_auroc,pixel_auroc,pro,bank_size,fit_sec,predict_sec,metric_sec,peak_gpu_gb,commit
+mvtec_ad,screw,padim_r18_L123_d100,padim,resnet18,1-2-3,,100,0.01,reproduce,all,320,0,160,136,0.7821274851403975,0.9733217836125025,0.9088463943894375,,13.83,7.58,3.2,,
+mvtec_ad,bottle,padim_r18_L123_d100,padim,resnet18,1-2-3,,100,0.01,reproduce,all,209,0,83,68,0.996031746031746,0.9808318064819364,0.9427133290957429,,10.05,4.04,1.63,,
+mvtec_ad,screw,patchcore_wrn50_L23_c1,patchcore,wide_resnet50_2,2-3,0.01,,,reproduce,all,320,0,160,136,0.9739700758352122,0.9923465094663649,0.9596942524390647,2508,47.99,17.05,3.22,,
+mvtec_ad,bottle,patchcore_wrn50_L23_c1,patchcore,wide_resnet50_2,2-3,0.01,,,reproduce,all,209,0,83,68,1.0,0.9857971133132698,0.9465131533174073,1638,27.68,8.29,1.52,,
+mvtec_ad,screw,padim_wrn50_L123_d550,padim,wide_resnet50_2,1-2-3,,550,0.01,reproduce,all,320,0,160,136,0.8614470178315228,0.984518524204585,0.938871061786784,,64.02,17.79,3.12,,
+mvtec_ad,bottle,padim_wrn50_L123_d550,padim,wide_resnet50_2,1-2-3,,550,0.01,reproduce,all,209,0,83,68,0.9992063492063492,0.9814914979182338,0.9487238540748593,,44.37,9.29,1.48,,
+mvtec_ad,screw,patchcore_wrn50_L23_c10,patchcore,wide_resnet50_2,2-3,0.1,,,reproduce,all,320,0,160,136,0.9877023980323837,0.9942193291265852,0.9704833649732949,25088,213.12,28.56,3.34,,
+mvtec_ad,bottle,patchcore_wrn50_L23_c10,patchcore,wide_resnet50_2,2-3,0.1,,,reproduce,all,209,0,83,68,1.0,0.9859285401573387,0.9467587086703465,16385,99.94,12.89,1.51,,

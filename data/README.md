@@ -6,7 +6,7 @@
 data/
   mvtec_ad/<부류>/{train,test,ground_truth}/...
   visa/<부류>/...           + split_csv/1cls.csv
-  real_iad/<부류>/...
+  real_iad/<부류>/...       + realiad_jsons/
 ```
 
 ## MVTec AD
@@ -24,8 +24,9 @@ data/
 
 ## Real-IAD
 
-1. Hugging Face 계정으로 `Real-IAD/Real-IAD` 데이터셋 페이지에서 접근을 신청한다. 저자 승인이 나야 내려받을 수 있다.
-2. 원본은 한 변이 2,000~5,000px이다. 이 레포는 256px로 줄인 판을 쓴다. 줄인 판(256·512·1024)과 시점 이름 C1~C5는 anomalib 문서의 표기이고, 논문에는 없다(논문은 원본을 직접 줄였고 시점을 No.1~No.5로 부른다).
-3. 논문의 single-view 설정은 위(top view) 한 시점이다. C1이 위 시점인지 받은 뒤 사진으로 확인한다.
+1. Hugging Face 계정으로 `Real-IAD/Real-IAD` 데이터셋 페이지에서 접근을 신청한다. 저자 승인이 나야 내려받을 수 있다. 이 레포의 실행에서는 받아 둔 부류 zip(`MyDrive/Real_IAD/<부류>.zip`)과 분할 JSON(`MyDrive/realiad_jsons.zip`)을 쓴다. `data.prepare_real_iad`가 zip에서 한 시점만 푼다.
+2. 원본은 한 변이 2,000~5,000px이다. 줄인 판(256·512·1024)과 시점 이름 C1~C5는 anomalib 문서의 표기이고, 논문에는 없다(논문은 원본을 직접 줄였고 시점을 No.1~No.5로 부른다). 받아 둔 zip이 어느 해상도인지는 `notebooks/00_check_visa_realiad.ipynb`에서 재서 여기 적는다. 어느 판이든 비교 단계에서 `Resize((256, 256))`으로 줄인다.
+3. 논문의 single-view 설정은 위(top view) 한 시점이다. C1이 위 시점인지 같은 노트북에서 사진으로 확인한다.
 4. 채점은 표본 라벨이 아니라 이미지 라벨로 한다. 이상 표본 안에도 결함이 안 보이는 시점의 사진이 있다.
-5. 승인에 걸리는 기간, 줄인 판 용량, 라이선스는 신청한 뒤 여기 적는다.
+5. 라이선스는 데이터셋 페이지에서 확인해서 여기 적는다.
+6. 읽기 코드는 JSON 항목의 `anomaly_class`, `image_path`, `mask_path`를 쓴다. 파일은 이름으로 찾고, JSON에 있는 파일이 하나라도 없으면 오류를 낸다. 지금까지 가짜 파일로만 시험했으므로 실제 JSON과 맞는지는 위 노트북에서 처음 확인한다.
