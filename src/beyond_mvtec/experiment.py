@@ -1,5 +1,6 @@
 """설정 목록, 한 부류 실행, 끊겨도 이어 가는 격자 실행, 요약과 재현 판정."""
 import csv
+import gc
 import os
 import random
 import time
@@ -160,6 +161,9 @@ def run_one(setting, dataset, root, category, seed, preprocess_name, preprocess,
             arrays.update(maps=maps.astype(np.float16), masks=masks)
         np.savez_compressed(os.path.join(save_dir, stem + ".npz"), **arrays)
     del model
+    # 원본 PatchCore 의 NearestNeighbourScorer 는 순환 참조라 del 만으로 FAISS 인덱스가 풀리지 않는다.
+    # GPU 에서는 인덱스의 StandardGpuResources 하나가 임시 메모리 1.5 GiB 를 잡는다(faiss 소스).
+    gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     return row

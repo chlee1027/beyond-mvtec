@@ -1,3 +1,4 @@
+import gc
 import os
 
 import numpy as np
@@ -110,3 +111,29 @@ def test_patchcore_adapter_runs_on_upstream(tmp_path):
     # 8 x 8 격자 x 6장 = 조각 384개, 10% 면 38개(원본은 int 내림)
     assert row["bank_size"] == 38
     assert row["image_auroc"] == 1.0
+
+
+def test_run_one_releases_faiss_index(tmp_path):
+    """원본 PatchCore 의 순환 참조로 FaissNN 이 남으면 GPU 에서 자원마다 임시 메모리 1.5 GiB 가 묶인다."""
+    pytest.importorskip("faiss")
+    pytest.importorskip("patchcore.patchcore")
+    from patchcore.common import FaissNN
+
+    def alive():
+        return sum(type(o) is FaissNN for o in gc.get_objects())
+
+    _fake_mvtec(str(tmp_path))
+    setting = ex.patchcore_setting("resnet18", [2, 3], 0.1)
+    preprocess = {"resize": [64, 64], "center_crop": None}
+    options = dict(device="cpu", batch_size=2, num_workers=0)
+    ex.run_one(setting, "mvtec_ad", str(tmp_path), "toy", 0, "p", preprocess, **options)
+    # 자동 GC 가 우연히 돌면 차이가 안 보이므로 끄고 잰다
+    gc.collect()
+    before = alive()
+    gc.disable()
+    try:
+        for seed in (1, 2):
+            ex.run_one(setting, "mvtec_ad", str(tmp_path), "toy", seed, "p", preprocess, **options)
+        assert alive() == before
+    finally:
+        gc.enable()
