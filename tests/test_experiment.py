@@ -12,10 +12,34 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG = ex.load_config(os.path.join(ROOT, "configs", "experiments.yaml"))
 
 
-def test_twelve_comparison_settings():
+REAL_IAD_ALL = [
+    "audiojack", "bottle_cap", "button_battery", "end_cap", "eraser", "fire_hood", "mint", "mounts",
+    "pcb", "phone_battery", "plastic_nut", "plastic_plug", "porcelain_doll", "regulator",
+    "rolled_strip_base", "sim_card_set", "switch", "tape", "terminalblock", "toothbrush", "toy",
+    "toy_brick", "transistor1", "u_block", "usb", "usb_adaptor", "vcpill", "wooden_beads",
+    "woodstick", "zipper",
+]
+
+
+def test_ten_comparison_settings_without_layer1_at_ten_percent():
     settings = ex.comparison_settings(CONFIG)
-    assert len(settings) == 12 and len({s["setting"] for s in settings}) == 12
-    assert sum(s["method"] == "patchcore" for s in settings) == 8
+    names = {s["setting"] for s in settings}
+    assert len(settings) == 10 and len(names) == 10
+    assert sum(s["method"] == "patchcore" for s in settings) == 6
+    assert not names & {"patchcore_r18_L123_c10", "patchcore_wrn50_L123_c10"}
+    assert {"patchcore_r18_L123_c1", "patchcore_wrn50_L123_c1", "patchcore_wrn50_L23_c10"} <= names
+
+
+def test_without_exclude_the_grid_has_twelve():
+    config = {**CONFIG, "methods": {**CONFIG["methods"],
+                                    "patchcore": {**CONFIG["methods"]["patchcore"], "exclude": []}}}
+    assert len(ex.comparison_settings(config)) == 12
+
+
+def test_real_iad_categories_are_the_seeded_draw():
+    draw = CONFIG["datasets"]["real_iad"]["draw"]
+    assert ex.draw_categories(REAL_IAD_ALL, draw["k"], draw["seed"]) == CONFIG["datasets"]["real_iad"]["categories"]
+    assert ex.draw_categories(list(reversed(REAL_IAD_ALL)), 10, 0) == CONFIG["datasets"]["real_iad"]["categories"]
 
 
 def test_reproduce_targets_match_the_readme():
@@ -137,3 +161,39 @@ def test_run_one_releases_faiss_index(tmp_path):
         assert alive() == before
     finally:
         gc.enable()
+
+
+def test_kendall_pairs_counts_flipped_pairs():
+    values = pd.DataFrame({"a": [0.9, 0.8, 0.7, 0.6], "b": [0.9, 0.8, 0.7, 0.6],
+                           "c": [0.8, 0.9, 0.7, 0.6], "d": [0.6, 0.7, 0.8, 0.9]},
+                          index=["s1", "s2", "s3", "s4"])
+    out = ex.kendall_pairs(values).set_index("pair")
+    assert out.loc["a - b", "tau_b"] == pytest.approx(1.0) and out.loc["a - b", "discordant"] == 0
+    # 쌍 6개 중 (s1, s2) 하나만 뒤집힘 -> (5 - 1) / 6
+    assert out.loc["a - c", "discordant"] == 1 and out.loc["a - c", "tau_b"] == pytest.approx(4 / 6)
+    assert out.loc["a - d", "tau_b"] == pytest.approx(-1.0) and out.loc["a - d", "n_pairs"] == 6
+
+
+def _q1_csv(path, dataset, values_by_seed):
+    rows = []
+    for seed, values in values_by_seed.items():
+        for setting, (v1, v2) in values.items():
+            for category, v in (("x", v1), ("y", v2)):
+                rows.append({"dataset": dataset, "category": category, "setting": setting,
+                             "preprocess": "compare", "n_train_requested": "all", "seed": seed,
+                             "image_auroc": v, "pixel_auroc": v, "pro": v})
+    pd.DataFrame(rows).to_csv(path, index=False)
+    return str(path)
+
+
+def test_rank_and_kendall_across_csv_files(tmp_path):
+    a = _q1_csv(tmp_path / "a.csv", "mvtec_ad", {0: {"s1": (1.0, 0.8), "s2": (0.8, 0.8), "s3": (0.6, 0.6)},
+                                                1: {"s1": (1.0, 1.0), "s2": (0.8, 0.6), "s3": (0.6, 0.6)}})
+    b = _q1_csv(tmp_path / "b.csv", "visa", {0: {"s1": (0.5, 0.5), "s2": (0.7, 0.7), "s3": (0.4, 0.4)},
+                                             1: {"s1": (0.5, 0.5), "s2": (0.7, 0.7), "s3": (0.4, 0.4)}})
+    values, ranks = ex.rank_by_dataset([a, b])
+    assert values.loc["s1", "mvtec_ad"] == pytest.approx(95.0)  # 시드 평균 (90 + 100) / 2
+    assert ranks["mvtec_ad"].tolist() == [1.0, 2.0, 3.0] and ranks["visa"].tolist() == [2.0, 1.0, 3.0]
+    per_seed = ex.kendall_per_seed([a, b])
+    assert sorted(per_seed["seed"]) == [0, 1]
+    assert (per_seed["discordant"] == 1).all()

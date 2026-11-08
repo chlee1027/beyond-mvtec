@@ -20,8 +20,13 @@ datasets:
     categories: all   # 12 부류
     split: 1cls       # 공식 분할 CSV
   real_iad:
-    categories: []    # 내려받은 뒤 확정
-    views: [C1]       # 위(top) 시점이어야 함. C1 은 anomalib 표기, 받은 뒤 확인
+    # 30 부류 이름을 정렬해 random.Random(0).sample(이름, 10) 으로 뽑았다(experiment.draw_categories).
+    # 결과를 보기 전에 정했다. 30 부류 전부는 Q1 계산 시간 때문에 쓰지 않는다
+    categories: [bottle_cap, pcb, phone_battery, porcelain_doll, regulator, sim_card_set, switch,
+                 usb, wooden_beads, woodstick]
+    draw: {seed: 0, k: 10}
+    views: [C1]       # 위(top) 시점. 00 노트북에서 audiojack 다섯 시점 사진으로 확인
+    split: sv         # realiad_jsons_sv (단일 시점 분할). 부류마다 항목 수가 C1 사진 수와 같다
     label: image      # 표본 라벨이 아니라 이미지 라벨로 채점
     image_size: 256   # 비교 단계 전처리로 256 까지 줄인다. 받아 둔 zip 의 해상도와 상관없다
 
@@ -30,6 +35,10 @@ methods:
     backbones: [resnet18, wide_resnet50_2]
     layers: [[2, 3], [1, 2, 3]]
     coreset_ratio: [0.01, 0.10]
+    # 계산 시간 때문에 Q1 에서 뺀다. 층 (1,2,3) 은 조각 격자가 layer1 이라 뱅크가 (2,3) 의 4 배이고
+    # 코어셋 시간은 뱅크 크기의 제곱으로 는다. 재현 CSV 로 잡은 추정은 README 「Q1 설정」
+    exclude:
+      - {layers: [1, 2, 3], coreset_ratio: 0.10}
     neighborhood: 3   # 조각 특징을 3x3 이웃으로 평균
     upstream_commit: fcaa92f124fb1ad74a7acf56726decd4b27cbcad  # patchcore-inspection
   padim:

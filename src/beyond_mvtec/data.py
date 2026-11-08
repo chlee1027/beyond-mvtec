@@ -97,24 +97,22 @@ def list_visa(root, category):
     return Split(sorted(train), test)
 
 
-def _find_real_iad_json(json_root, category):
-    """같은 이름의 JSON 이 여러 폴더에 있으면 기본 분할(`realiad_jsons`)을 고른다."""
-    found = []
+REAL_IAD_SPLITS = {"sv": "realiad_jsons_sv", "multi": "realiad_jsons"}
+
+
+def _find_real_iad_json(json_root, category, split="sv"):
+    """분할 JSON 을 폴더 이름으로 고른다.
+
+    `realiad_jsons_sv` 는 단일 시점 분할이다(anomalib 문서: 「Single-view metadata」).
+    `realiad_jsons` 는 다중 시점 분할이고, 같은 C1 사진을 학습·시험에 다르게 나눈다.
+    """
+    if split not in REAL_IAD_SPLITS:
+        raise ValueError(f"split 은 {sorted(REAL_IAD_SPLITS)} 중 하나: {split}")
+    want = REAL_IAD_SPLITS[split]
     for folder, _, files in os.walk(json_root):
-        if f"{category}.json" in files:
-            found.append(os.path.join(folder, f"{category}.json"))
-
-    def rank(path):
-        parent = os.path.basename(os.path.dirname(path)).lower()
-        if parent == "realiad_jsons":
-            return 0
-        if "fuiad" in parent:
-            return 2
-        return 3 if parent.endswith("_sv") else 1
-
-    if not found:
-        raise FileNotFoundError(f"{json_root} 아래에 {category}.json 이 없다")
-    return sorted(found, key=rank)[0]
+        if os.path.basename(folder).lower() == want and f"{category}.json" in files:
+            return os.path.join(folder, f"{category}.json")
+    raise FileNotFoundError(f"{json_root} 아래 {want}/ 에 {category}.json 이 없다")
 
 
 def _real_iad_is_normal(entry, normal_class):
@@ -129,11 +127,18 @@ def view_of(path):
     return match.group(1) if match else None
 
 
-def list_real_iad(root, category, view="C1", json_root=None):
-    """JSON 의 이미지 라벨로 채점한다. 이상 표본 안에서 결함이 안 보이는 시점은 정상이다."""
+def list_real_iad(root, category, view="C1", json_root=None, split="sv"):
+    """JSON 의 이미지 라벨로 채점한다. 이상 표본 안에서 결함이 안 보이는 시점은 정상이다.
+
+    단일 시점 분할(sv)에 다른 시점의 항목이 있으면 오류를 낸다. 걸러 버리면 분할이 조용히 줄어든다.
+    """
     json_root = json_root or os.path.join(root, "realiad_jsons")
-    with open(_find_real_iad_json(json_root, category), encoding="utf-8") as f:
+    with open(_find_real_iad_json(json_root, category, split), encoding="utf-8") as f:
         meta = json.load(f)
+    if split == "sv":
+        other = [e["image_path"] for e in meta["train"] + meta["test"] if view_of(e["image_path"]) != view]
+        if other:
+            raise ValueError(f"{category}: 단일 시점 분할에 {view} 아닌 항목 {len(other)}개. 예: {other[:3]}")
     normal_class = str(meta.get("meta", {}).get("normal_class", "OK")).upper()
 
     by_name = {}

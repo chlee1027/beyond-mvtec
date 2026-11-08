@@ -51,14 +51,25 @@ def padim_setting(backbone, layers, reduced_dim, cov_eps):
     }
 
 
+def _excluded(layers, coreset_ratio, exclude):
+    return any(list(e["layers"]) == list(layers) and e["coreset_ratio"] == coreset_ratio
+               for e in exclude)
+
+
 def comparison_settings(config):
-    """Q1 의 설정 12개."""
+    """Q1 의 설정. PatchCore 격자에서 `exclude` 에 적은 조합을 뺀다(지금 설정 파일로 10개)."""
     pc, pa = config["methods"]["patchcore"], config["methods"]["padim"]
+    exclude = pc.get("exclude", [])
     out = [patchcore_setting(b, l, c) for b in pc["backbones"] for l in pc["layers"]
-           for c in pc["coreset_ratio"]]
+           for c in pc["coreset_ratio"] if not _excluded(l, c, exclude)]
     out += [padim_setting(b, l, pa["reduced_dims"][b], pa["cov_eps"])
             for b in pa["backbones"] for l in pa["layers"]]
     return out
+
+
+def draw_categories(names, k, seed):
+    """부류 이름을 정렬한 뒤 시드로 k 개를 뽑는다. 돌려주는 목록도 정렬한다."""
+    return sorted(random.Random(seed).sample(sorted(names), k))
 
 
 def reproduce_settings(config):
@@ -82,13 +93,14 @@ def fix_seeds(seed):
         torch.cuda.manual_seed_all(seed)
 
 
-def list_split(dataset, root, category, view="C1", json_root=None):
+def list_split(dataset, root, category, view="C1", json_root=None, real_iad_split="sv"):
     if dataset == "mvtec_ad":
         return data_lib.list_mvtec(root, category)
     if dataset == "visa":
         return data_lib.list_visa(root, category)
     if dataset == "real_iad":
-        return data_lib.list_real_iad(root, category, view=view, json_root=json_root)
+        return data_lib.list_real_iad(root, category, view=view, json_root=json_root,
+                                      split=real_iad_split)
     raise ValueError(dataset)
 
 
@@ -118,9 +130,9 @@ def predict_all(model, loader, output_size):
 
 def run_one(setting, dataset, root, category, seed, preprocess_name, preprocess, n_train="all",
             device="cuda", batch_size=8, num_workers=4, faiss_on_gpu=False, save_dir=None,
-            save_maps=False, commit="", view="C1", json_root=None):
+            save_maps=False, commit="", view="C1", json_root=None, real_iad_split="sv"):
     """부류 하나를 학습하고 채점해 CSV 한 줄을 돌려준다."""
-    split = list_split(dataset, root, category, view, json_root)
+    split = list_split(dataset, root, category, view, json_root, real_iad_split)
     train = data_lib.subsample_train(split.train, n_train, seed)
     train_loader, test_loader, output_size = data_lib.make_loaders(
         train, split.test, preprocess, batch_size, num_workers)
@@ -201,13 +213,27 @@ def run_grid(settings, dataset, root, categories, seeds, preprocess_name, prepro
             f"fit={row['fit_sec']}s pred={row['predict_sec']}s gpu={row['peak_gpu_gb']}GB")
 
 
+GROUP = ["dataset", "setting", "preprocess", "n_train_requested"]
+
+
+def _read(csv_path):
+    """CSV 경로 하나 또는 여러 개를 한 표로 읽는다."""
+    paths = [csv_path] if isinstance(csv_path, (str, os.PathLike)) else list(csv_path)
+    return pd.concat([pd.read_csv(p) for p in paths], ignore_index=True)
+
+
+def per_seed(csv_path):
+    """시드마다 부류 평균을 낸다. 단위는 0~1."""
+    df = _read(csv_path)
+    return df.groupby(GROUP + ["seed"]).agg(
+        **{m: (m, "mean") for m in METRICS}, n_categories=("category", "nunique")).reset_index()
+
+
 def summarize(csv_path):
     """시드마다 부류 평균을 내고, 그 값의 시드 간 평균과 표준편차를 낸다. 단위는 %."""
-    df = pd.read_csv(csv_path)
-    group = ["dataset", "setting", "preprocess", "n_train_requested"]
-    per_seed = df.groupby(group + ["seed"]).agg(
-        **{m: (m, "mean") for m in METRICS}, n_categories=("category", "nunique")).reset_index()
-    out = per_seed.groupby(group).agg(
+    group = GROUP
+    per_seed_df = per_seed(csv_path)
+    out = per_seed_df.groupby(group).agg(
         **{f"{m}_mean": (m, "mean") for m in METRICS},
         **{f"{m}_std": (m, lambda v: v.std(ddof=1) if len(v) > 1 else float("nan")) for m in METRICS},
         n_seeds=("seed", "nunique"), n_categories=("n_categories", "min")).reset_index()
@@ -238,3 +264,42 @@ def judge_reproduction(summary, settings, tolerance):
                 "n_categories": int(hit["n_categories"].iloc[0]) if len(hit) else 0,
             })
     return pd.DataFrame(rows)
+
+
+def kendall_pairs(values):
+    """열(데이터셋)마다 설정 값이 든 표를 받아, 열 쌍마다 Kendall 순위 상관(tau-b)과 뒤집힌 쌍 수를 낸다."""
+    from itertools import combinations
+
+    from scipy.stats import kendalltau
+
+    rows = []
+    for a, b in combinations(values.columns, 2):
+        both = values[[a, b]].dropna()
+        x, y = both[a].to_numpy(), both[b].to_numpy()
+        sign = [np.sign(x[i] - x[j]) * np.sign(y[i] - y[j])
+                for i in range(len(x)) for j in range(i + 1, len(x))]
+        tau, p_value = kendalltau(x, y)
+        rows.append({"pair": f"{a} - {b}", "n_settings": len(both), "n_pairs": len(sign),
+                     "concordant": int(sum(v > 0 for v in sign)),
+                     "discordant": int(sum(v < 0 for v in sign)),
+                     "tied": int(sum(v == 0 for v in sign)), "tau_b": tau, "p_value": p_value})
+    return pd.DataFrame(rows)
+
+
+def rank_by_dataset(csv_path, metric="image_auroc", n_train="all"):
+    """설정 x 데이터셋 표 둘: 시드 평균 값(%)과 데이터셋 안 순위(1 = 가장 높음, 동률은 평균 순위)."""
+    summary = summarize(csv_path)
+    summary = summary[summary["n_train_requested"].astype(str) == str(n_train)]
+    values = summary.pivot_table(index="setting", columns="dataset", values=f"{metric}_mean")
+    return values, values.rank(ascending=False, method="average")
+
+
+def kendall_per_seed(csv_path, metric="image_auroc", n_train="all"):
+    """시드 하나의 값만으로 순위 상관을 따로 낸다. 시드에 따라 tau 가 얼마나 흔들리는지 본다."""
+    df = per_seed(csv_path)
+    df = df[df["n_train_requested"].astype(str) == str(n_train)]
+    out = []
+    for seed, part in df.groupby("seed"):
+        values = part.pivot_table(index="setting", columns="dataset", values=metric)
+        out.append(kendall_pairs(values).assign(seed=seed))
+    return pd.concat(out, ignore_index=True)

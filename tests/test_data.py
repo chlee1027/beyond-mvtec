@@ -99,15 +99,34 @@ def real_iad(tmp_path):
         _mask(str(cat / mask))
         test.append({"category": "NG", "anomaly_class": "AK", "image_path": rel, "mask_path": mask})
     meta = {"meta": {"normal_class": "OK"}, "train": train, "test": test}
-    for folder in ("realiad_jsons", "realiad_jsons_sv"):
+    # 단일 시점 분할: C1 만 있고 학습·시험을 다중 시점 분할과 다르게 나눈다(정상 둘을 학습에)
+    c1 = lambda entries: [e for e in entries if "_C1_" in e["image_path"]]
+    sv = {"meta": {"normal_class": "OK"},
+          "train": c1(train) + [e for e in c1(test) if e["anomaly_class"] == "OK"],
+          "test": [e for e in c1(test) if e["anomaly_class"] != "OK"]}
+    for folder, payload in (("realiad_jsons", meta), ("realiad_jsons_sv", sv),
+                            ("realiad_jsons_fuiad_0.0", {"meta": {}, "train": [], "test": []})):
         os.makedirs(tmp_path / "realiad_jsons" / folder)
-        payload = meta if folder == "realiad_jsons" else {"meta": {}, "train": [], "test": []}
         (tmp_path / "realiad_jsons" / folder / "pcb.json").write_text(json.dumps(payload))
     return str(tmp_path)
 
 
-def test_real_iad_filters_one_view_and_uses_image_labels(real_iad):
+def test_real_iad_uses_single_view_split_by_default(real_iad):
     split = data.list_real_iad(real_iad, "pcb", view="C1")
+    assert len(split.train) == 2 and [s.label for s in split.test] == [1]
+
+
+def test_real_iad_single_view_split_rejects_other_views(real_iad):
+    path = os.path.join(real_iad, "realiad_jsons", "realiad_jsons_sv", "pcb.json")
+    meta = json.load(open(path))
+    meta["train"].append({"anomaly_class": "OK", "image_path": "OK/S0001/pcb_0001_OK_C2_1.jpg"})
+    json.dump(meta, open(path, "w"))
+    with pytest.raises(ValueError, match="C1 아닌 항목 1개"):
+        data.list_real_iad(real_iad, "pcb", view="C1")
+
+
+def test_real_iad_filters_one_view_and_uses_image_labels(real_iad):
+    split = data.list_real_iad(real_iad, "pcb", view="C1", split="multi")
     assert [os.path.basename(p) for p in split.train] == ["pcb_0001_OK_C1_1.jpg"]
     assert sorted(s.label for s in split.test) == [0, 1]
     normal = next(s for s in split.test if s.label == 0)
@@ -121,7 +140,7 @@ def test_real_iad_falls_back_to_sibling_mask(real_iad):
     for entry in meta["test"]:
         entry.pop("mask_path", None)
     json.dump(meta, open(path, "w"))
-    split = data.list_real_iad(real_iad, "pcb", view="C1")
+    split = data.list_real_iad(real_iad, "pcb", view="C1", split="multi")
     assert next(s for s in split.test if s.label == 1).mask.endswith(".png")
 
 
