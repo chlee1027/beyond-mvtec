@@ -51,7 +51,7 @@ Q2는 새 제품을 라인에 막 넣어 정상 샘플이 적은 상황을 흉�
 
 | 부분 | 출처 |
 |---|---|
-| PatchCore | 원 저자 공개 코드 [`amazon-science/patchcore-inspection`](https://github.com/amazon-science/patchcore-inspection)(Apache-2.0)을 커밋 `fcaa92f`로 고정해 쓴다. 원본 파일은 고치지 않고 [`patchcore_adapter.py`](src/beyond_mvtec/patchcore_adapter.py)에서 바깥으로 끼운다. 바꾸는 것은 다섯이다. (1) 백본 목록에 resnet18 추가, (2) 이미지 점수와 분할 지도 저장(원본은 `results.csv`만 남긴다), (3) Q2용 50장·10장 표본 고르기(원본 `--train_val_split`은 정렬된 파일 앞에서부터 자른다), (4) VisA·Real-IAD 데이터 읽기, (5) 아래 「전처리」의 정사각 줄이기 |
+| PatchCore | 원 저자 공개 코드 [`amazon-science/patchcore-inspection`](https://github.com/amazon-science/patchcore-inspection)(Apache-2.0)을 커밋 `fcaa92f`로 고정해 쓴다. 원본 파일은 고치지 않고 [`patchcore_adapter.py`](src/beyond_mvtec/patchcore_adapter.py)에서 바깥으로 끼운다. 바꾸는 것은 다섯이다. (1) 백본 목록에 resnet18 추가, (2) 이미지 점수와 분할 지도 저장(원본은 `results.csv`만 남긴다), (3) Q2용 50장·10장 표본 고르기(원본 `--train_val_split`은 정렬된 파일 앞에서부터 자른다), (4) VisA·Real-IAD 데이터 읽기, (5) 아래 「전처리」의 정사각 줄이기. 계산 값은 그대로 두고 GPU 메모리 쓰는 법만 하나 바꾼다. 코어셋 샘플러가 128차원 사영을 기울기 계산을 끄지 않고 해서, 코어셋 전 뱅크(VisA pcb3, 층 (1,2,3)에서 15.2 GB)가 GPU에 묶여 남았다. Q1 첫 실행에서 바로 뒤 FAISS의 GPU 메모리 요청이 이것 때문에 실패해서, 사영을 기울기 없이 하고 코어셋 뒤 PyTorch 캐시를 비운다. 같은 조각을 고르는 것은 시험으로 확인했다 |
 | PaDiM | 저자 공식 코드가 없어서 직접 구현했다([`padim.py`](src/beyond_mvtec/padim.py)). 원 논문이 정한 값은 그대로 쓰고, 정하지 않은 값은 아래 「PaDiM에서 이 레포가 고른 값」에 적었다 |
 | 지표 (이미지·픽셀 AUROC, PRO) | 두 방법이 같은 코드로 재도록 [`metrics.py`](src/beyond_mvtec/metrics.py) 하나를 쓴다. 원본 PatchCore 코드는 PRO를 계산하지 않는다 |
 | 데이터 읽기 | 세 데이터셋의 파일 목록과 전처리는 [`data.py`](src/beyond_mvtec/data.py), 설정 목록·실행·판정은 [`experiment.py`](src/beyond_mvtec/experiment.py)에 있다 |
@@ -168,7 +168,7 @@ Colab L4 GPU, faiss GPU 검색. MVTec 15 부류 x 시드 3개 = 설정마다 45�
 - **Screw 이미지 AUROC는 논문보다 1.0~1.77점 높다.** 원본 실행기도 같은 값을 내므로 이 레포 경로의 차이가 아니다.
 - **마스크 처리가 픽셀 AUROC를 바꾼다.** 원본은 Screw 99.41·99.52, Bottle 98.47·98.48(1%·10%)이다. 이 레포 마스크(최근접)로는 위 표의 값이 된다. 이 레포 지도에 원본식 마스크를 씌워 다시 재면 원본 값이 나와 원인이 마스크임을 확인했다. 원본식에서는 결함 픽셀 수가 Screw 68.7%, Bottle 92.9%로 준다. 논문과의 차이는 최근접이 0.08점 이내, 원본식이 0.21점 이내다.
 
-시험은 `tests/`에 61개 있고 모두 통과한다. PRO는 문턱마다 직접 세는 계산과 맞댄다.
+시험은 `tests/`에 66개 있고 모두 통과한다. PRO는 문턱마다 직접 세는 계산과 맞댄다.
 
 > (2026-11-06에 적은 미확인 목록) GPU와 faiss GPU 경로, VisA·Real-IAD 실제 파일. -> GPU와 faiss GPU 경로는 2026-11-08 재현에서 돌았다. VisA 12 부류와 Real-IAD 30 부류(C1)는 [`notebooks/00_check_visa_realiad.ipynb`](notebooks/00_check_visa_realiad.ipynb)에서 읽기 코드로 다 읽혔고, JSON에 있는 파일 가운데 빠진 것이 없었다. 학습은 아직 돌리지 않았다.
 

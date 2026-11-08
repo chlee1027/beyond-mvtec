@@ -197,3 +197,26 @@ def test_rank_and_kendall_across_csv_files(tmp_path):
     per_seed = ex.kendall_per_seed([a, b])
     assert sorted(per_seed["seed"]) == [0, 1]
     assert (per_seed["discordant"] == 1).all()
+
+
+def test_releasing_sampler_picks_the_same_coreset():
+    """감싼 샘플러가 원본과 같은 조각을 고르고, 사영 결과에 기울기 그래프가 붙지 않는다."""
+    pytest.importorskip("patchcore.sampler")
+    import torch
+    import patchcore.sampler
+    from beyond_mvtec.patchcore_adapter import _releasing_sampler
+
+    features = np.random.RandomState(0).randn(500, 64).astype(np.float32)
+    picked = []
+    for cls in (patchcore.sampler.ApproximateGreedyCoresetSampler,
+                _releasing_sampler(patchcore.sampler.ApproximateGreedyCoresetSampler)):
+        torch.manual_seed(0)
+        np.random.seed(0)
+        picked.append(cls(0.1, torch.device("cpu"), dimension_to_project_features_to=16).run(features))
+    assert picked[0].shape == (50, 64)
+    np.testing.assert_array_equal(picked[0], picked[1])
+
+    torch.manual_seed(0)
+    reduced = _releasing_sampler(patchcore.sampler.ApproximateGreedyCoresetSampler)(
+        0.1, torch.device("cpu"), dimension_to_project_features_to=16)._reduce_features(torch.from_numpy(features))
+    assert reduced.grad_fn is None and not reduced.requires_grad

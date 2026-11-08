@@ -6,12 +6,37 @@ README 의 다섯 변경은 이렇게 들어간다.
     불러 점수와 지도만 받고, 저장은 experiment.py 가 맡는다.
 (3) 표본 고르기, (4) 데이터 읽기, (5) 정사각 줄이기: 원본 데이터셋 대신 data.py 의 로더를 넘긴다.
 
+GPU 메모리 때문에 샘플러 하나를 감싼다(고르는 값은 같다). `_releasing_sampler` 참고.
+
 학습 순서는 원본 `bin/run_patchcore.py` 와 같다. 부류마다 시드 고정 -> 샘플러 -> 모델 -> fit.
 """
 import numpy as np
+import torch
 
 UPSTREAM_COMMIT = "fcaa92f124fb1ad74a7acf56726decd4b27cbcad"
 _UPSTREAM_NAME = {"resnet18": "resnet18", "wide_resnet50_2": "wideresnet50"}
+
+
+def _releasing_sampler(base):
+    """원본 코어셋 샘플러를 감싸 GPU 메모리만 다르게 쓴다.
+
+    원본 `_reduce_features` 는 기울기를 끄지 않고 사영해서, GPU 로 올린 코어셋 전 뱅크 전체가
+    자동 미분 그래프에 묶여 코어셋을 고르는 내내 남는다(VisA pcb3, 층 (1,2,3) 에서 15.2 GB).
+    끝나면 풀리지만 PyTorch 캐시에 남아, 바로 뒤 FAISS 의 GPU 임시 메모리(1.5 GiB) 요청이 실패했다.
+    기울기를 끄는 것과 캐시를 비우는 것은 계산 값을 바꾸지 않는다.
+    """
+    class ReleasingSampler(base):
+        def _reduce_features(self, features):
+            with torch.no_grad():
+                return super()._reduce_features(features)
+
+        def run(self, features):
+            out = super().run(features)
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            return out
+
+    return ReleasingSampler
 
 
 class PatchCoreAdapter:
@@ -25,7 +50,7 @@ class PatchCoreAdapter:
 
         patchcore.backbones._BACKBONES.setdefault("resnet18", "models.resnet18(pretrained=True)")
         patchcore.utils.fix_seeds(seed, device)
-        sampler = patchcore.sampler.ApproximateGreedyCoresetSampler(coreset_ratio, device)
+        sampler = _releasing_sampler(patchcore.sampler.ApproximateGreedyCoresetSampler)(coreset_ratio, device)
         name = _UPSTREAM_NAME[backbone]
         net = patchcore.backbones.load(name)
         net.name, net.seed = name, None
