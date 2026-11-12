@@ -61,5 +61,9 @@ reproduce:            # 1단계 재현 목표. 값은 README 「재현 목표」
     - {method: padim, backbone: resnet18, layers: [1, 2, 3],
        target: {pixel_auroc: 96.7, pro: 90.1}}   # ResNet18 이미지 AUROC 는 논문에 없다
 
-few_shot:             # Q2. 방법마다 Q1에서 가장 좋은 설정 하나로
-  n_train: [all, 50, 10]
+few_shot:             # Q2. 방법마다 Q1 1위 설정을 데이터셋마다 모은 넷(2026-11-13)
+  # (2026-11-08 계획) 방법마다 Q1에서 가장 좋은 설정 하나. -> Q1 에서 1위가 데이터셋마다 갈려서 둘씩 쓴다.
+  # PatchCore: MVTec 1위 wrn50 (2,3) 10%, Real-IAD·VisA 1위 wrn50 (1,2,3) 1%.
+  # PaDiM: MVTec·Real-IAD 1위 wrn50 (2,3), VisA 1위 wrn50 (1,2,3)(VisA 차이 0.19점, 시드 표준편차 0.52·0.61).
+  settings: [patchcore_wrn50_L23_c10, patchcore_wrn50_L123_c1, padim_wrn50_L23_d550, padim_wrn50_L123_d550]
+  n_train: [all, 50, 10]   # all 은 Q1 결과를 그대로 쓴다. 같은 시드의 10장은 50장 안에 든다(subsample_train)

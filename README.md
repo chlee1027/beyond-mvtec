@@ -105,7 +105,8 @@ Q1에서 비교하는 설정은 10개다.
 
 1. **재현.** MVTec AD에서 원 논문 값과 맞는지 확인한다. PatchCore는 원본 코드가 이 레포의 데이터 읽기·지표 코드를 거쳐도 같은 값을 내는지, PaDiM은 직접 구현이 맞는지를 본다. 맞지 않으면 다음 단계로 가지 않는다.
 2. **Q1.** 비교 단계 전처리로 설정 10개 x 데이터셋 3개 x 시드 3개를 돌린다.
-3. **Q2.** 방법마다 Q1에서 가장 좋았던 설정 하나로 학습 장수를 줄여 본다.
+3. **Q2.** Q1 1위 설정을 데이터셋마다 모은 넷으로 학습 장수를 50장, 10장으로 줄여 본다. PatchCore는 WRN-50-2 (2,3) 10%(MVTec 1위)와 (1,2,3) 1%(Real-IAD·VisA 1위), PaDiM은 WRN-50-2 (2,3)(MVTec·Real-IAD 1위)과 (1,2,3)(VisA 1위)이다. 전체 장수 칸은 Q1 결과를 쓴다. 노트북은 [`03_q2_few_shot.ipynb`](notebooks/03_q2_few_shot.ipynb)다.
+   > (2026-11-08 계획) 방법마다 Q1에서 가장 좋았던 설정 하나로 학습 장수를 줄여 본다. -> Q1에서 1위가 데이터셋마다 갈려서(위 「Q1 결과」) 방법마다 둘씩 쓴다.
 4. **정리.** 결과 표, 그림, 한계를 적는다.
 
 ### 재현 목표 (MVTec AD 15 부류 평균)
@@ -317,6 +318,7 @@ tests/                     pytest. 원본 PatchCore를 쓰는 시험은 PATCHCOR
 notebooks/00_check_visa_realiad.ipynb   Drive의 VisA·Real-IAD 점검 (학습 없음)
 notebooks/01_reproduce_mvtec.ipynb      1단계 재현 (Colab)
 notebooks/02_q1_compare.ipynb           2단계 Q1 (Colab)
+notebooks/03_q2_few_shot.ipynb          3단계 Q2 (Colab)
 results/                   결과 CSV와 그림 (reproduce_mvtec.csv: 1단계 재현 180줄,
                            q1_mvtec_ad.csv · q1_real_iad.csv · q1_visa.csv: Q1 450 · 300 · 360줄)
 ```
