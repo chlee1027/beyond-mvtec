@@ -43,7 +43,7 @@ data/
 ## Real-IAD
 
 1. Hugging Face 계정으로 `Real-IAD/Real-IAD` 데이터셋 페이지에서 접근을 신청한다. 저자 승인이 나야 내려받을 수 있다. 이 레포의 실행에서는 받아 둔 부류 zip(`MyDrive/Real_IAD/<부류>.zip`)과 분할 JSON(`MyDrive/realiad_jsons.zip`)을 쓴다. `data.prepare_real_iad`가 zip에서 한 시점만 푼다.
-2. 원본은 한 변이 2,000~5,000px이다. 줄인 판(256·512·1024)과 시점 이름 C1~C5는 anomalib 문서의 표기이고, 논문에는 없다(논문은 원본을 직접 줄였고 시점을 No.1~No.5로 부른다). 받아 둔 zip은 1,024 x 1,024 판이다(30 부류마다 학습 첫 이미지를 잰 값, 2026-11-08). 비교 단계에서 `Resize((256, 256))`으로 줄인다.
+2. 원본은 한 변이 2,000\~5,000px이다. 줄인 판(256·512·1024)과 시점 이름 C1\~C5는 anomalib 문서의 표기이고, 논문에는 없다(논문은 원본을 직접 줄였고 시점을 No.1\~No.5로 부른다). 받아 둔 zip은 1,024 x 1,024 판이다(30 부류마다 학습 첫 이미지를 잰 값, 2026-11-08). 비교 단계에서 `Resize((256, 256))`으로 줄인다.
 3. 논문의 single-view 설정은 위(top view) 한 시점이다. 같은 노트북에서 Audiojack 표본 하나의 다섯 시점을 그려 보니 C1이 위에서 내려다본 사진이었다. 다른 부류는 사진으로 보지 않았다. 각 zip에는 시점마다 같은 수의 사진이 있다(Audiojack은 시점마다 1,010장).
 4. 채점은 표본 라벨이 아니라 이미지 라벨로 한다. 이상 표본 안에도 결함이 안 보이는 시점의 사진이 있다.
 5. 라이선스는 데이터셋 페이지에서 확인해서 여기 적는다.
@@ -54,7 +54,7 @@ data/
 
 1. MVTec 홈페이지의 MVTec AD 2 페이지에서 이용 조건에 동의하고 내려받는다. 8 부류, 30.4 GB다. 라이선스는 CC BY-NC-SA 4.0으로 알고 있다. 데이터 폴더의 `license.txt`는 아직 읽지 않았다.
 2. 부류마다 `train/good`, `validation/good`, `test_public/{good,bad,ground_truth/bad}`, `test_private`, `test_private_mixed`가 있다. 정답 마스크는 `test_public/ground_truth/bad/<번호>_<조건>_mask.png`이고 값은 0과 255다. 이 레포는 `train/good`과 `test_public`만 쓴다.
-3. 파일 이름은 `<번호>_<조건>.png`이다. 조건은 학습이 regular뿐이고 test_public은 regular, overexposed, underexposed, shift_1~shift_4다.
+3. 파일 이름은 `<번호>_<조건>.png`이다. 조건은 학습이 regular뿐이고 test_public은 regular, overexposed, underexposed, shift_1\~shift_4다.
 4. Sheet Metal·Vial·Wallplugs는 흑백(단일 채널)이다. 해상도는 부류마다 하나다(2026-11-13, 폴더마다 세 장 확인).
 
    | 부류 | 학습 | test_public (결함) | 가로 x 세로 |
