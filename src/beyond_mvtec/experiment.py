@@ -96,6 +96,8 @@ def fix_seeds(seed):
 def list_split(dataset, root, category, view="C1", json_root=None, real_iad_split="sv"):
     if dataset == "mvtec_ad":
         return data_lib.list_mvtec(root, category)
+    if dataset == "mvtec_ad_2":
+        return data_lib.list_mvtec2(root, category)
     if dataset == "visa":
         return data_lib.list_visa(root, category)
     if dataset == "real_iad":

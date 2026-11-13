@@ -67,6 +67,86 @@ def list_mvtec(root, category):
     return Split(train, test)
 
 
+MVTEC2_CATEGORIES = ["can", "fabric", "fruit_jelly", "rice", "sheet_metal", "vial", "wallplugs", "walnuts"]
+_MVTEC2_NAME = re.compile(r"^\d+_(.+)$")
+# 줄여 둘 갈래. validation 은 PatchCore · PaDiM 이 쓰지 않고, test_private(_mixed) 는 정답이 없다
+MVTEC2_CACHE_DIRS = [("train/good", "image"), ("test_public/good", "image"),
+                     ("test_public/bad", "image"), ("test_public/ground_truth/bad", "mask")]
+
+
+def mvtec2_condition(path):
+    """파일 이름 `번호_조건.png` 의 조건: regular, overexposed, underexposed, shift_1 ...
+
+    학습은 regular 만 있고, test_public 은 조건이 여럿이다(mvtec2_check2 노트북에서 셈).
+    """
+    stem = os.path.splitext(os.path.basename(path))[0]
+    match = _MVTEC2_NAME.match(stem)
+    if not match:
+        raise ValueError(f"이름이 `번호_조건` 이 아니다: {path}")
+    return match.group(1)
+
+
+def list_mvtec2(root, category):
+    """MVTec AD 2. 정답이 공개된 test_public 으로만 채점한다.
+
+    결함 폴더가 종류별로 나뉘지 않고 `bad` 하나라서, `anomaly` 칸에는 결함 종류 대신 조명 조건을 넣는다.
+    """
+    base = os.path.join(root, category)
+    train = _images_in(os.path.join(base, "train", "good"))
+    public = os.path.join(base, "test_public")
+    test = [Sample(p, 0, None, mvtec2_condition(p)) for p in _images_in(os.path.join(public, "good"))]
+    for path in _images_in(os.path.join(public, "bad")):
+        stem = os.path.splitext(os.path.basename(path))[0]
+        mask = os.path.join(public, "ground_truth", "bad", f"{stem}_mask.png")
+        if not os.path.isfile(mask):
+            raise FileNotFoundError(f"마스크가 없다: {mask}")
+        test.append(Sample(path, 1, mask, mvtec2_condition(path)))
+    return Split(train, test)
+
+
+def cache_mvtec2(src_root, dst_root, category, size, workers=8, log=print):
+    """원본(1400~4224 픽셀)을 비교 단계 크기로 한 번 줄여 같은 폴더 구조로 저장한다.
+
+    이미지는 RGB 로 바꾼 뒤 `T.Resize(size)`, 마스크는 최근접으로 줄인다. TrainDataset · TestDataset 과
+    같은 단계다. 실행 때 같은 크기로 다시 줄이는 단계는 Pillow 가 그대로 복사하므로, 원본을 읽은 것과
+    값이 같다(test_mvtec2_cache_gives_the_same_tensors).
+    파일마다 임시 이름으로 쓴 뒤 바꿔서 끊겨도 반쯤 쓴 파일이 남지 않는다. 다시 돌리면 있는 파일은
+    건너뛰고, 부류가 다 끝나면 표시 파일을 남긴다. 돌려주는 값은 이번에 새로 쓴 장수다.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    size = tuple(int(s) for s in size)
+    marker = os.path.join(dst_root, category, f".cached_{size[0]}x{size[1]}")
+    if os.path.isfile(marker):
+        return 0
+    image_resize = T.Resize(size)
+    mask_resize = T.Resize(size, interpolation=T.InterpolationMode.NEAREST)
+    jobs = []
+    for sub, kind in MVTEC2_CACHE_DIRS:
+        src_dir = os.path.join(src_root, category, *sub.split("/"))
+        dst_dir = os.path.join(dst_root, category, *sub.split("/"))
+        os.makedirs(dst_dir, exist_ok=True)
+        for src in _images_in(src_dir):
+            dst = os.path.join(dst_dir, os.path.basename(src))
+            if not os.path.isfile(dst):
+                jobs.append((src, dst, kind))
+
+    def one(job):
+        src, dst, kind = job
+        with Image.open(src) as im:
+            out = image_resize(im.convert("RGB")) if kind == "image" else mask_resize(im)
+        tmp = dst + ".tmp"
+        out.save(tmp, format="PNG")
+        os.replace(tmp, dst)
+
+    with ThreadPoolExecutor(workers) as pool:
+        for i, _ in enumerate(pool.map(one, jobs), 1):
+            if i % 200 == 0 or i == len(jobs):
+                log(f"{category}: {i}/{len(jobs)}")
+    open(marker, "w").close()
+    return len(jobs)
+
+
 def _visa_rows(root):
     path = os.path.join(root, "split_csv", "1cls.csv")
     with open(path, newline="", encoding="utf-8") as f:

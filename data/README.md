@@ -7,6 +7,7 @@ data/
   mvtec_ad/<부류>/{train,test,ground_truth}/...
   visa/<부류>/...           + split_csv/1cls.csv
   real_iad/<부류>/...       + realiad_jsons/
+  mvtec_ad_2/<부류>/{train,validation,test_public,test_private,test_private_mixed}/...
 ```
 
 ## MVTec AD
@@ -48,3 +49,21 @@ data/
 5. 라이선스는 데이터셋 페이지에서 확인해서 여기 적는다.
 6. 읽기 코드는 JSON 항목의 `anomaly_class`, `image_path`, `mask_path`를 쓴다. 파일은 이름으로 찾고, JSON에 있는 파일이 하나라도 없으면 오류를 낸다. 실제 항목은 `{"category", "anomaly_class", "image_path", "mask_path"}` 꼴이고, 정상은 `anomaly_class: "OK"`, `mask_path: null`이다. 30 부류 모두 빠진 파일 없이 읽혔고 이상 이미지마다 마스크가 있었다.
 7. `realiad_jsons.zip` 안에는 폴더가 여섯 있다: `realiad_jsons`, `realiad_jsons_sv`, `realiad_jsons_fuiad_0.0`·`0.1`·`0.2`·`0.4`. 폴더마다 부류 JSON이 30개다. 이 레포는 단일 시점 분할 `realiad_jsons_sv`를 쓴다(`configs/experiments.yaml`의 `real_iad.split`). 고른 이유는 README의 「Real-IAD를 쓰는 방식」에 있다.
+
+## MVTec AD 2
+
+1. MVTec 홈페이지의 MVTec AD 2 페이지에서 이용 조건에 동의하고 내려받는다. 8 부류, 30.4 GB다. 라이선스는 CC BY-NC-SA 4.0으로 알고 있다. 데이터 폴더의 `license.txt`는 아직 읽지 않았다.
+2. 부류마다 `train/good`, `validation/good`, `test_public/{good,bad,ground_truth/bad}`, `test_private`, `test_private_mixed`가 있다. 정답 마스크는 `test_public/ground_truth/bad/<번호>_<조건>_mask.png`이고 값은 0과 255다. 이 레포는 `train/good`과 `test_public`만 쓴다.
+3. 파일 이름은 `<번호>_<조건>.png`이다. 조건은 학습이 regular뿐이고 test_public은 regular, overexposed, underexposed, shift_1~shift_4다.
+4. Sheet Metal·Vial·Wallplugs는 흑백(단일 채널)이다. 해상도는 부류마다 하나다(2026-11-13, 폴더마다 세 장 확인).
+
+   | 부류 | 학습 | test_public (결함) | 가로 x 세로 |
+   |---|---|---|---|
+   | Can | 412 | 162 (90) | 2232 x 1024 |
+   | Fabric | 387 | 156 (90) | 2448 x 2048 |
+   | Fruit Jelly | 263 | 80 (60) | 2100 x 1520 |
+   | Rice | 313 | 132 (90) | 2448 x 2048 |
+   | Sheet Metal | 137 | 114 (90) | 4224 x 1056 |
+   | Vial | 291 | 140 (105) | 1400 x 1900 |
+   | Wallplugs | 293 | 150 (90) | 2448 x 2048 |
+   | Walnuts | 432 | 150 (90) | 2448 x 2048 |

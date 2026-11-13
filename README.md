@@ -10,7 +10,7 @@
 
 이 레포는 MVTec AD에서 매긴 설정 순위가 VisA와 Real-IAD에서도 유지되는지 잰다.
 
-> **상태 (2026-11-13).** Q1이 끝났다. 설정 10개 x 세 데이터셋(37 부류) x 시드 3개 = 1,110번을 빈칸 없이 돌렸다. 이미지 AUROC 순위의 Kendall 순위 상관은 데이터셋 쌍마다 0.51~0.78이고, MVTec 1위 설정이 VisA에서는 5위다. Q2도 끝났다. 설정 넷 x 37 부류 x 시드 3개 x 학습 50장·10장 = 888번이다. PatchCore 두 설정의 순서는 데이터셋마다 학습 장수를 줄여도 그대로였고, 10장에서 이미지 AUROC가 떨어진 폭은 데이터셋마다 달랐다(PatchCore (2,3) 10%: MVTec 5.59, VisA 6.87, Real-IAD 8.69점). 결과는 아래 「결과」에 있다. 관련 논문 여섯 편의 분석 노트는 [`papers/notes/`](papers/notes/)에 있다.
+> **상태 (2026-11-13).** Q1이 끝났다. 설정 10개 x 세 데이터셋(37 부류) x 시드 3개 = 1,110번을 빈칸 없이 돌렸다. 이미지 AUROC 순위의 Kendall 순위 상관은 데이터셋 쌍마다 0.51~0.78이고, MVTec 1위 설정이 VisA에서는 5위다. Q2도 끝났다. 설정 넷 x 37 부류 x 시드 3개 x 학습 50장·10장 = 888번이다. PatchCore 두 설정의 순서는 데이터셋마다 학습 장수를 줄여도 그대로였고, 10장에서 이미지 AUROC가 떨어진 폭은 데이터셋마다 달랐다(PatchCore (2,3) 10%: MVTec 5.59, VisA 6.87, Real-IAD 8.69점). 결과는 아래 「결과」에 있다. MVTec AD 2(8 부류)를 Q1의 넷째 데이터셋으로 붙일 코드와 노트북을 만들었고, 아직 돌리지 않았다(아래 「데이터셋」·「진행 순서」 4). 관련 논문 여섯 편의 분석 노트는 [`papers/notes/`](papers/notes/)에 있다.
 >
 > > (2026-11-13 오전 상태) Q1이 끝났다. Q2는 아직 돌리지 않았다.
 >
@@ -36,6 +36,7 @@ Q2는 새 제품을 라인에 막 넣어 정상 샘플이 적은 상황을 흉�
 | MVTec AD | 15 부류. 학습 3,629장(정상만), 시험 1,725장. 정사각 700~1024px. Grid·Screw·Zipper는 흑백 | 15 부류 전부 | MVTec 홈페이지. CC BY-NC-SA 4.0(홈페이지 기준이고 논문에는 적혀 있지 않다) |
 | VisA | 12 부류. 정상 9,621장, 이상 1,200장. 4,000 x 6,000 센서로 촬영 | 12 부류 전부, 공식 1cls 분할(부류마다 정상 90%로 학습하고, 남은 정상 10%와 이상 전부로 시험) | `amazon-science/spot-diff`. 저장소 코드는 Apache-2.0이고 데이터 라이선스는 확인 필요 |
 | Real-IAD | 30 부류. 정상 99,721장, 이상 51,329장. 시점 5개 | 10 부류(시드 0으로 뽑음), 위 시점(C1) 하나, 단일 시점 분할 `realiad_jsons_sv` | Hugging Face `Real-IAD/Real-IAD`. 저자 승인 필요, 라이선스 확인 필요 |
+| MVTec AD 2 | 8 부류. 학습 2,528장(정상만, 모두 regular 조명), test_public 1,084장(정상 379, 결함 705). 원본 1400 x 1900 ~ 4224 x 1056px. Sheet Metal·Vial·Wallplugs는 흑백 | 8 부류 전부, 정답이 공개된 test_public만(조명 조건 전부) | MVTec 홈페이지. CC BY-NC-SA 4.0. 데이터 폴더의 `license.txt`는 아직 읽지 않았다 |
 
 데이터는 레포에 올리지 않는다. 받는 순서는 [`data/README.md`](data/README.md)에 있다.
 
@@ -43,6 +44,11 @@ Q2는 새 제품을 라인에 막 넣어 정상 샘플이 적은 상황을 흉�
 - 시점 이름 C1~C5는 anomalib 문서의 표기이고 논문에는 없다(논문은 No.1~No.5). Audiojack 표본 하나의 다섯 시점 사진에서 C1이 위에서 내려다본 사진이었다. 다른 부류는 사진으로 보지 않았다.
 - 분할은 `realiad_jsons_sv`를 쓴다. anomalib 문서는 이 폴더를 「Single-view metadata」, `realiad_jsons`를 「Base metadata (multi-view)」라 적는다. 30 부류 모두 `realiad_jsons_sv`의 항목 수가 C1 사진 수와 같다(합 30,210). 두 분할은 같은 C1 사진을 학습·시험에 다르게 나눈다. 학습 장수 합이 단일 시점 분할 10,408장, 다중 시점 분할에서 C1만 고르면 7,293장이다. 단일 시점 분할에 C1 아닌 항목이 있으면 읽기 코드가 오류를 낸다.
 - 이상 표본 안에서도 결함이 안 보이는 시점의 사진은 정상이다. 그래서 표본 라벨이 아니라 이미지 라벨로 채점한다.
+
+**MVTec AD 2를 쓰는 방식(2026-11-13).** 장수와 해상도는 Drive의 원본을 노트북 두 개로 세고 잰 값이다(레포에 넣지 않은 점검용). 세 가지를 정했다.
+- test_private과 test_private_mixed는 정답이 공개되지 않아 쓰지 않는다. 그래서 논문들이 적는 비공개 시험셋 값과 바로 견주지 않는다.
+- 학습은 regular 조명뿐이고, test_public은 regular·overexposed·underexposed·shift_1~3(Vial만 shift_4, Fruit Jelly는 shift_2·3 없음)이 부류마다 조건 하나에 결함 15장, 정상 4~12장씩이다. 같은 번호가 조건마다 되풀이된다. 조건을 모두 함께 채점하고, 조건별 이미지 AUROC는 점수 파일로 따로 낸다. 순위가 바뀌면 그 안에 조명 변화에 대한 강건성이 섞인다.
+- 전처리는 Q1과 같은 256 x 256이다. 이 크기에서 결함 덩어리 2,058개 중 483개가 사라지고, 마스크 12장(Can 6, Fabric 6)은 결함 픽셀이 0이 된다. 256에서 남는 결함 면적의 중앙값은 Can 4픽셀, Fabric 7픽셀, Vial 697픽셀이다. 이미지 라벨은 그대로라 이미지 AUROC를 주 지표로 본다. 원본을 매 실행마다 읽지 않도록 256으로 한 번 줄여 두고 읽는다(`data.cache_mvtec2`). 원본을 읽어 줄인 텐서와 값이 같은 것을 시험으로 확인했다.
 
 ## 방법과 설정
 
@@ -109,7 +115,8 @@ Q1에서 비교하는 설정은 10개다.
 2. **Q1.** 비교 단계 전처리로 설정 10개 x 데이터셋 3개 x 시드 3개를 돌린다.
 3. **Q2.** Q1 1위 설정을 데이터셋마다 모은 넷으로 학습 장수를 50장, 10장으로 줄여 본다. PatchCore는 WRN-50-2 (2,3) 10%(MVTec 1위)와 (1,2,3) 1%(Real-IAD·VisA 1위), PaDiM은 WRN-50-2 (2,3)(MVTec·Real-IAD 1위)과 (1,2,3)(VisA 1위)이다. 전체 장수 칸은 Q1 결과를 쓴다. 노트북은 [`03_q2_few_shot.ipynb`](notebooks/03_q2_few_shot.ipynb)다.
    > (2026-11-08 계획) 방법마다 Q1에서 가장 좋았던 설정 하나로 학습 장수를 줄여 본다. -> Q1에서 1위가 데이터셋마다 갈려서(위 「Q1 결과」) 방법마다 둘씩 쓴다.
-4. **정리.** 결과 표, 그림, 한계를 적는다.
+4. **Q1 넷째 데이터셋, MVTec AD 2.** Q1과 같은 설정 10개 x 시드 3개를 8 부류에 돌린다(240번). 노트북은 [`04_mvtec_ad_2.ipynb`](notebooks/04_mvtec_ad_2.ipynb)다. 어림은 256 캐시 만들기 한 번 약 6시간, 실행 약 5.1시간이다(Q1 MVTec AD 시간을 학습 장수 비로 줄인 값).
+5. **정리.** 결과 표, 그림, 한계를 적는다.
 
 ### 재현 목표 (MVTec AD 15 부류 평균)
 
@@ -368,6 +375,7 @@ notebooks/00_check_visa_realiad.ipynb   Drive의 VisA·Real-IAD 점검 (학습 �
 notebooks/01_reproduce_mvtec.ipynb      1단계 재현 (Colab)
 notebooks/02_q1_compare.ipynb           2단계 Q1 (Colab)
 notebooks/03_q2_few_shot.ipynb          3단계 Q2 (Colab)
+notebooks/04_mvtec_ad_2.ipynb           4단계 Q1에 MVTec AD 2 더하기 (Colab)
 results/                   결과 CSV와 그림 (reproduce_mvtec.csv: 1단계 재현 180줄,
                            q1_mvtec_ad.csv · q1_real_iad.csv · q1_visa.csv: Q1 450 · 300 · 360줄,
                            q2_mvtec_ad.csv · q2_real_iad.csv · q2_visa.csv: Q2 360 · 240 · 288줄)

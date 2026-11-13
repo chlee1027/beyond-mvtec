@@ -205,3 +205,79 @@ def test_mask_stays_binary_after_shrinking(tmp_path):
     _mask(path, size=(700, 700), box=(100, 100, 400, 400))
     _, mask_tf, _ = data.build_transforms({"resize": [256, 256], "center_crop": None})
     assert set(np.unique(np.asarray(mask_tf(Image.open(path))))) == {0, 255}
+
+
+@pytest.fixture
+def mvtec2(tmp_path):
+    rng = np.random.RandomState(0)
+
+    def noise(path, size, mode):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        shape = (size[1], size[0]) if mode == "L" else (size[1], size[0], 3)
+        Image.fromarray(rng.randint(0, 256, shape).astype(np.uint8), mode).save(path)
+
+    src = tmp_path / "mvtec2"
+    for cat, mode in [("can", "RGB"), ("vial", "L")]:
+        base = src / cat
+        for i in range(3):
+            noise(str(base / "train" / "good" / f"{i:03d}_regular.png"), (300, 140), mode)
+        for cond in ["regular", "overexposed"]:
+            noise(str(base / "test_public" / "good" / f"000_{cond}.png"), (300, 140), mode)
+            noise(str(base / "test_public" / "bad" / f"000_{cond}.png"), (300, 140), mode)
+            _mask(str(base / "test_public" / "ground_truth" / "bad" / f"000_{cond}_mask.png"),
+                  size=(300, 140), box=(100, 40, 103, 43))
+        noise(str(base / "validation" / "good" / "000_regular.png"), (300, 140), mode)
+        noise(str(base / "test_private" / "000_regular.png"), (300, 140), mode)
+    return str(src)
+
+
+def test_mvtec2_lists_test_public_with_conditions(mvtec2):
+    split = data.list_mvtec2(mvtec2, "can")
+    assert len(split.train) == 3
+    assert sorted((s.label, s.anomaly) for s in split.test) == [
+        (0, "overexposed"), (0, "regular"), (1, "overexposed"), (1, "regular")]
+    assert all(s.mask.endswith(f"000_{s.anomaly}_mask.png") for s in split.test if s.label)
+    assert all("validation" not in p and "private" not in p for p in split.train)
+
+
+def test_mvtec2_condition_keeps_underscores():
+    assert data.mvtec2_condition("/x/012_shift_3.png") == "shift_3"
+    with pytest.raises(ValueError):
+        data.mvtec2_condition("/x/regular.png")
+
+
+def test_mvtec2_missing_mask_raises(mvtec2):
+    os.remove(os.path.join(mvtec2, "can", "test_public", "ground_truth", "bad", "000_regular_mask.png"))
+    with pytest.raises(FileNotFoundError):
+        data.list_mvtec2(mvtec2, "can")
+
+
+@pytest.mark.parametrize("category", ["can", "vial"])
+def test_mvtec2_cache_gives_the_same_tensors(mvtec2, tmp_path, category):
+    """줄여 둔 파일을 읽어도 원본을 읽은 것과 텐서가 같다(RGB 와 흑백 부류 둘 다)."""
+    size = (64, 64)
+    cache = str(tmp_path / "cache")
+    assert data.cache_mvtec2(mvtec2, cache, category, size, workers=2, log=lambda *_: None) == 9
+    orig, cached = data.list_mvtec2(mvtec2, category), data.list_mvtec2(cache, category)
+    assert [os.path.basename(p) for p in orig.train] == [os.path.basename(p) for p in cached.train]
+    assert [(s.label, s.anomaly) for s in orig.test] == [(s.label, s.anomaly) for s in cached.test]
+    image_tf, mask_tf, out = data.build_transforms({"resize": list(size), "center_crop": None})
+    for a, b in zip(orig.train, cached.train):
+        assert torch.equal(data.TrainDataset([a], image_tf)[0]["image"], data.TrainDataset([b], image_tf)[0]["image"])
+    one, two = data.TestDataset(orig.test, image_tf, mask_tf, out), data.TestDataset(cached.test, image_tf, mask_tf, out)
+    for i in range(len(one)):
+        assert torch.equal(one[i]["image"], two[i]["image"])
+        assert torch.equal(one[i]["mask"], two[i]["mask"])
+
+
+def test_mvtec2_cache_resumes_and_marks_done(mvtec2, tmp_path):
+    cache = str(tmp_path / "cache")
+    first = os.path.join(cache, "can", "train", "good", "000_regular.png")
+    data.cache_mvtec2(mvtec2, cache, "can", (64, 64), workers=2, log=lambda *_: None)
+    os.remove(os.path.join(cache, "can", ".cached_64x64"))
+    os.remove(first)
+    # 끊긴 자리: 표시 파일이 없고 한 장이 빠졌으면 그 한 장만 다시 쓴다
+    assert data.cache_mvtec2(mvtec2, cache, "can", (64, 64), workers=2, log=lambda *_: None) == 1
+    assert os.path.isfile(first)
+    assert data.cache_mvtec2(mvtec2, cache, "can", (64, 64), workers=2, log=lambda *_: None) == 0
+    assert not any(f.endswith(".tmp") for _, _, fs in os.walk(cache) for f in fs)

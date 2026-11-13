@@ -29,6 +29,10 @@ datasets:
     split: sv         # realiad_jsons_sv (단일 시점 분할). 부류마다 항목 수가 C1 사진 수와 같다
     label: image      # 표본 라벨이 아니라 이미지 라벨로 채점
     image_size: 256   # 비교 단계 전처리로 256 까지 줄인다. 받아 둔 zip 의 해상도와 상관없다
+  mvtec_ad_2:         # Q1 넷째 데이터셋(2026-11-13 추가). 설정 10개 x 시드 3개를 그대로 돈다
+    categories: all   # 8 부류(data.MVTEC2_CATEGORIES)
+    split: test_public   # 정답이 공개된 시험셋. 조명 조건(regular 외 5~6가지)을 모두 함께 채점한다
+    cache: [256, 256] # 원본을 비교 단계 크기로 한 번 줄여 Drive 에 둔다(data.cache_mvtec2). preprocess.compare 와 같아야 한다
 
 methods:
   patchcore:
